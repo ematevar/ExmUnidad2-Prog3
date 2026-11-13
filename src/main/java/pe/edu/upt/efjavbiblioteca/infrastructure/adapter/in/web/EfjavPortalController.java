@@ -276,13 +276,14 @@ public class EfjavPortalController {
         return "redirect:/portal";
     }
 
-    // Registrar nuevo trámite
+    // Registrar nuevo trámite (Envío directo o Borrador)
     @PostMapping("/tramites/registrar")
     public String registrarTramite(@RequestParam("tipoTramite") String tipoTramite,
                                    @RequestParam("asunto") String asunto,
                                    @RequestParam("instanciaDestinoId") Long instanciaDestinoId,
-                                   @RequestParam("documentoPdf") MultipartFile documentoPdf,
-                                   @RequestParam("firmaEstudiante") String firmaEstudiante,
+                                   @RequestParam(value = "documentoPdf", required = false) MultipartFile documentoPdf,
+                                   @RequestParam(value = "firmaEstudiante", required = false) String firmaEstudiante,
+                                   @RequestParam(value = "accionGuardar", defaultValue = "ENVIAR") String accionGuardar,
                                    HttpSession session,
                                    RedirectAttributes redirectAttributes) {
         if (!validarSesion(session)) return "redirect:/login";
@@ -290,11 +291,38 @@ public class EfjavPortalController {
         String userCodigo = (String) session.getAttribute("AUTH_USER_CODIGO");
         String equipo = (String) session.getAttribute("AUTH_EQUIPO_ID");
 
+        boolean esBorrador = "BORRADOR".equalsIgnoreCase(accionGuardar);
+
         try {
             EfjavTramiteEntity tramite = efjavTramiteService.efjavMtdRegistrarTramite(
-                    userId, userCodigo, tipoTramite, asunto, instanciaDestinoId, documentoPdf, firmaEstudiante, "127.0.0.1", equipo
+                    userId, userCodigo, tipoTramite, asunto, instanciaDestinoId, documentoPdf, firmaEstudiante, esBorrador, "127.0.0.1", equipo
             );
-            redirectAttributes.addFlashAttribute("successMsg", "Trámite enviado exitosamente. Código de seguimiento: " + tramite.getEfjavCodigoSeguimiento());
+            if (esBorrador) {
+                redirectAttributes.addFlashAttribute("successMsg", "Borrador guardado exitosamente. Podrá completarlo y enviarlo posteriormente.");
+            } else {
+                redirectAttributes.addFlashAttribute("successMsg", "Trámite enviado exitosamente. Código de seguimiento: " + tramite.getEfjavCodigoSeguimiento());
+            }
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/portal";
+    }
+
+    // Cambiar estado administrativo desde la oficina (Recibir, En Proceso, Archivar)
+    @PostMapping("/tramites/cambiar-estado-oficina")
+    public String cambiarEstadoOficina(@RequestParam("tramiteId") Long tramiteId,
+                                       @RequestParam("nuevoEstado") String nuevoEstado,
+                                       @RequestParam(value = "observacion", required = false) String observacion,
+                                       HttpSession session,
+                                       RedirectAttributes redirectAttributes) {
+        if (!validarSesion(session)) return "redirect:/login";
+        Long userId = (Long) session.getAttribute("AUTH_USER_ID");
+        String userCodigo = (String) session.getAttribute("AUTH_USER_CODIGO");
+        String equipo = (String) session.getAttribute("AUTH_EQUIPO_ID");
+
+        try {
+            efjavTramiteService.efjavMtdCambiarEstadoOficina(tramiteId, userId, userCodigo, nuevoEstado, observacion, "127.0.0.1", equipo);
+            redirectAttributes.addFlashAttribute("successMsg", "Estado del expediente actualizado a: " + nuevoEstado);
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
         }

@@ -341,9 +341,14 @@
                                     <input type="hidden" name="firmaEstudiante" id="hiddenFirmaTramite">
                                     <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="limpiarCanvas('canvasFirmaTramite')">Limpiar Firma</button>
                                 </div>
-                                <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold">
-                                    <i class="bi bi-send-fill me-1"></i> Enviar Expediente y Obtener Código Único
-                                </button>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" name="accionGuardar" value="ENVIAR" class="btn btn-primary flex-grow-1 py-2 fw-semibold">
+                                        <i class="bi bi-send-fill me-1"></i> Enviar Expediente
+                                    </button>
+                                    <button type="submit" name="accionGuardar" value="BORRADOR" class="btn btn-outline-secondary py-2" title="Guardar como borrador sin enviar">
+                                        <i class="bi bi-save me-1"></i> Guardar Borrador
+                                    </button>
+                                </div>
                             </form>
                         </div>
                     </div>
@@ -409,6 +414,12 @@
                                             <button type="submit" name="accion" value="RECHAZAR" class="btn btn-danger"><i class="bi bi-x-lg"></i> Rechazar</button>
                                         </div>
                                     </form>
+                                    <form action="/tramites/cambiar-estado-oficina" method="post" class="mt-1 d-flex gap-1">
+                                        <input type="hidden" name="tramiteId" th:value="${t.efjavId}">
+                                        <button type="submit" name="nuevoEstado" value="RECIBIDO" class="btn btn-outline-primary btn-sm flex-fill" style="font-size: 0.7rem;"><i class="bi bi-inbox"></i> Marcar Recibido</button>
+                                        <button type="submit" name="nuevoEstado" value="EN_PROCESO" class="btn btn-outline-secondary btn-sm flex-fill" style="font-size: 0.7rem;"><i class="bi bi-hourglass-split"></i> En Proceso</button>
+                                        <button type="submit" name="nuevoEstado" value="ARCHIVADO" class="btn btn-outline-dark btn-sm flex-fill" style="font-size: 0.7rem;"><i class="bi bi-archive"></i> Archivar</button>
+                                    </form>
                                 </div>
                             </div>
                             <div th:if="${#lists.isEmpty(bandejaFacultad)}" class="text-center text-muted py-4 small">Sin expedientes pendientes.</div>
@@ -437,6 +448,12 @@
                                             <button type="submit" name="accion" value="OBSERVAR" class="btn btn-warning"><i class="bi bi-exclamation-circle"></i> Observar</button>
                                         </div>
                                     </form>
+                                    <form action="/tramites/cambiar-estado-oficina" method="post" class="mt-1 d-flex gap-1">
+                                        <input type="hidden" name="tramiteId" th:value="${t.efjavId}">
+                                        <button type="submit" name="nuevoEstado" value="RECIBIDO" class="btn btn-outline-primary btn-sm flex-fill" style="font-size: 0.7rem;"><i class="bi bi-inbox"></i> Recibido</button>
+                                        <button type="submit" name="nuevoEstado" value="EN_PROCESO" class="btn btn-outline-secondary btn-sm flex-fill" style="font-size: 0.7rem;"><i class="bi bi-hourglass-split"></i> En Proceso</button>
+                                        <button type="submit" name="nuevoEstado" value="ARCHIVADO" class="btn btn-outline-dark btn-sm flex-fill" style="font-size: 0.7rem;"><i class="bi bi-archive"></i> Archivar</button>
+                                    </form>
                                 </div>
                             </div>
                             <div th:if="${#lists.isEmpty(bandejaEpis)}" class="text-center text-muted py-4 small">Sin expedientes en EPIS.</div>
@@ -464,6 +481,12 @@
                                             <button type="submit" name="accion" value="APROBAR" class="btn btn-success"><i class="bi bi-check-circle"></i> Aprobar</button>
                                             <button type="submit" name="accion" value="RECHAZAR" class="btn btn-danger"><i class="bi bi-x-circle"></i> Denegar</button>
                                         </div>
+                                    </form>
+                                    <form action="/tramites/cambiar-estado-oficina" method="post" class="mt-1 d-flex gap-1">
+                                        <input type="hidden" name="tramiteId" th:value="${t.efjavId}">
+                                        <button type="submit" name="nuevoEstado" value="RECIBIDO" class="btn btn-outline-primary btn-sm flex-fill" style="font-size: 0.7rem;"><i class="bi bi-inbox"></i> Recibido</button>
+                                        <button type="submit" name="nuevoEstado" value="EN_PROCESO" class="btn btn-outline-secondary btn-sm flex-fill" style="font-size: 0.7rem;"><i class="bi bi-hourglass-split"></i> En Proceso</button>
+                                        <button type="submit" name="nuevoEstado" value="ARCHIVADO" class="btn btn-outline-dark btn-sm flex-fill" style="font-size: 0.7rem;"><i class="bi bi-archive"></i> Archivar</button>
                                     </form>
                                 </div>
                             </div>

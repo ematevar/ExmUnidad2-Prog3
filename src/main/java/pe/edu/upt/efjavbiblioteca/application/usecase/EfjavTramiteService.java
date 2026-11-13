@@ -77,29 +77,40 @@ public class EfjavTramiteService {
         return efjavMovimientoJpaRepository.findByEfjavTramiteIdOrderByEfjavFechaMovimientoAsc(tramiteId);
     }
 
-    // Proceso 6.8: Presentación de trámite académico con PDF y firma
+    // Proceso 6.8: Presentación de trámite académico (Envío directo o Borrador)
     @Transactional
     public EfjavTramiteEntity efjavMtdRegistrarTramite(Long estudianteId, String estudianteCodigo,
                                                        String tipoTramite, String asunto, Long instanciaDestinoId,
                                                        MultipartFile documentoPdf, String firmaEstudianteBase64,
+                                                       boolean esBorrador,
                                                        String ip, String equipo) throws IOException {
-        // RN: Horario de trámites 08:00 a 17:00
-        if (!efjavTimeService.efjavFncEsHorarioTramites()) {
-            throw new IllegalStateException("Horario no permitido: La presentación de trámites se habilita de Lunes a Viernes de 08:00 a 17:00.");
+        if (!esBorrador) {
+            // RN: Horario de trámites 08:00 a 17:00
+            if (!efjavTimeService.efjavFncEsHorarioTramites()) {
+                throw new IllegalStateException("Horario no permitido: La presentación de trámites se habilita de Lunes a Viernes de 08:00 a 17:00.");
+            }
+
+            if (firmaEstudianteBase64 == null || firmaEstudianteBase64.trim().isEmpty()) {
+                throw new IllegalArgumentException("Validación obligatoria: No se puede enviar el trámite sin la firma del estudiante.");
+            }
         }
 
-        if (firmaEstudianteBase64 == null || firmaEstudianteBase64.trim().isEmpty()) {
-            throw new IllegalArgumentException("Validación obligatoria: No se puede enviar el trámite sin la firma del estudiante.");
+        String rutaPdf = null;
+        String hashPdf = null;
+        if (documentoPdf != null && !documentoPdf.isEmpty()) {
+            rutaPdf = efjavStorageService.efjavMtdGuardarArchivoPdf(documentoPdf, "tramites");
+            hashPdf = DigestUtils.sha256Hex(documentoPdf.getBytes());
+        } else if (!esBorrador) {
+            throw new IllegalArgumentException("El formato institucional en PDF es obligatorio.");
         }
 
-        // Guardar archivo PDF con validación de MIME y cabecera
-        String rutaPdf = efjavStorageService.efjavMtdGuardarArchivoPdf(documentoPdf, "tramites");
-        String hashPdf = DigestUtils.sha256Hex(documentoPdf.getBytes());
-
-        // Guardar firma digitalizada
-        EfjavFirmaEntity firma = efjavStorageService.efjavMtdGuardarFirmaBase64(
-                estudianteId, "Estudiante", "ESTUDIANTE", firmaEstudianteBase64, "PRESENTACION_TRAMITE"
-        );
+        Long firmaId = null;
+        if (firmaEstudianteBase64 != null && !firmaEstudianteBase64.trim().isEmpty()) {
+            EfjavFirmaEntity firma = efjavStorageService.efjavMtdGuardarFirmaBase64(
+                    estudianteId, "Estudiante", "ESTUDIANTE", firmaEstudianteBase64, esBorrador ? "BORRADOR_TRAMITE" : "PRESENTACION_TRAMITE"
+            );
+            firmaId = firma.getEfjavId();
+        }
 
         String codigoSeguimiento = "TR-" + String.format("%06d", (int)(Math.random() * 900000 + 100000));
 
@@ -110,34 +121,60 @@ public class EfjavTramiteService {
         tramite.setEfjavAsunto(asunto);
         tramite.setEfjavInstanciaDestinoId(instanciaDestinoId);
         tramite.setEfjavUbicacionActualId(instanciaDestinoId);
-        tramite.setEfjavEstado("ENVIADO");
+        tramite.setEfjavEstado(esBorrador ? "BORRADOR" : "ENVIADO");
         tramite.setEfjavFechaEnvio(efjavTimeService.efjavFncObtenerFechaHoraServidor());
-        tramite.setEfjavFirmaEstudianteId(firma.getEfjavId());
+        tramite.setEfjavFirmaEstudianteId(firmaId != null ? firmaId : 0L);
 
         EfjavTramiteEntity guardado = efjavTramiteJpaRepository.save(tramite);
 
-        // Guardar registro del documento asociado
-        EfjavDocumentoEntity docEntity = new EfjavDocumentoEntity();
-        docEntity.setEfjavTramiteId(guardado.getEfjavId());
-        docEntity.setEfjavNombreOriginal(documentoPdf.getOriginalFilename());
-        docEntity.setEfjavRutaAlmacenamiento(rutaPdf);
-        docEntity.setEfjavTipoDocumento("SOLICITUD_PDF");
-        docEntity.setEfjavHashSha256(hashPdf);
-        docEntity.setEfjavTamanioBytes(documentoPdf.getSize());
-        efjavDocumentoJpaRepository.save(docEntity);
+        if (rutaPdf != null) {
+            EfjavDocumentoEntity docEntity = new EfjavDocumentoEntity();
+            docEntity.setEfjavTramiteId(guardado.getEfjavId());
+            docEntity.setEfjavNombreOriginal(documentoPdf.getOriginalFilename());
+            docEntity.setEfjavRutaAlmacenamiento(rutaPdf);
+            docEntity.setEfjavTipoDocumento("SOLICITUD_PDF");
+            docEntity.setEfjavHashSha256(hashPdf);
+            docEntity.setEfjavTamanioBytes(documentoPdf.getSize());
+            efjavDocumentoJpaRepository.save(docEntity);
+        }
 
-        // Registrar primer movimiento en el historial
+        // Registrar movimiento
         EfjavMovimientoTramiteEntity mov = new EfjavMovimientoTramiteEntity();
         mov.setEfjavTramiteId(guardado.getEfjavId());
         mov.setEfjavInstanciaOrigenId(instanciaDestinoId);
         mov.setEfjavInstanciaDestinoId(instanciaDestinoId);
         mov.setEfjavResponsableId(estudianteId);
-        mov.setEfjavEstadoResultante("ENVIADO");
-        mov.setEfjavObservacion("Expediente presentado por el estudiante con firma y documento adjunto");
+        mov.setEfjavEstadoResultante(esBorrador ? "BORRADOR" : "ENVIADO");
+        mov.setEfjavObservacion(esBorrador ? "Solicitud guardada como borrador" : "Expediente presentado formalmente por el estudiante");
         efjavMovimientoJpaRepository.save(mov);
 
-        efjavAuditoriaRepository.efjavMtdRegistrar(estudianteCodigo, "PRESENTAR_TRAMITE", "TRAMITE",
-                "Trámite presentado con código: " + codigoSeguimiento, ip, equipo, "EXITOSO");
+        efjavAuditoriaRepository.efjavMtdRegistrar(estudianteCodigo, esBorrador ? "GUARDAR_BORRADOR" : "PRESENTAR_TRAMITE", "TRAMITE",
+                "Trámite: " + codigoSeguimiento + " - Estado: " + (esBorrador ? "BORRADOR" : "ENVIADO"), ip, equipo, "EXITOSO");
+
+        return guardado;
+    }
+
+    // Confirmar recepción o poner en proceso desde la oficina
+    @Transactional
+    public EfjavTramiteEntity efjavMtdCambiarEstadoOficina(Long tramiteId, Long responsableId, String responsableCodigo,
+                                                           String nuevoEstado, String observacion, String ip, String equipo) {
+        EfjavTramiteEntity tramite = efjavTramiteJpaRepository.findById(tramiteId)
+                .orElseThrow(() -> new IllegalArgumentException("Trámite no encontrado"));
+
+        tramite.setEfjavEstado(nuevoEstado);
+        if ("CONCLUIDO".equalsIgnoreCase(nuevoEstado) || "ARCHIVADO".equalsIgnoreCase(nuevoEstado)) {
+            tramite.setEfjavFechaConclusion(efjavTimeService.efjavFncObtenerFechaHoraServidor());
+        }
+        EfjavTramiteEntity guardado = efjavTramiteJpaRepository.save(tramite);
+
+        EfjavMovimientoTramiteEntity mov = new EfjavMovimientoTramiteEntity();
+        mov.setEfjavTramiteId(tramite.getEfjavId());
+        mov.setEfjavInstanciaOrigenId(tramite.getEfjavUbicacionActualId());
+        mov.setEfjavInstanciaDestinoId(tramite.getEfjavUbicacionActualId());
+        mov.setEfjavResponsableId(responsableId);
+        mov.setEfjavEstadoResultante(nuevoEstado);
+        mov.setEfjavObservacion(observacion != null ? observacion : "Cambio de estado a " + nuevoEstado);
+        efjavMovimientoJpaRepository.save(mov);
 
         return guardado;
     }
