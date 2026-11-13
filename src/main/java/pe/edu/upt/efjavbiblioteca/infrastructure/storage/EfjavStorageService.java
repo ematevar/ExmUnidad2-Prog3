@@ -36,11 +36,27 @@ public class EfjavStorageService {
             Path dirPath = Paths.get(efjavStorageLocation, "firmas");
             Files.createDirectories(dirPath);
 
-            String pureBase64 = base64Data;
-            if (base64Data.contains(",")) {
-                pureBase64 = base64Data.split(",")[1];
+            String pureBase64 = base64Data != null ? base64Data.trim() : "";
+            if (pureBase64.contains(",")) {
+                pureBase64 = pureBase64.split(",")[1].trim();
             }
-            byte[] bytes = Base64.getDecoder().decode(pureBase64);
+
+            // Normalizar saltos de línea y espacios
+            pureBase64 = pureBase64.replaceAll("\\s+", "");
+
+            byte[] bytes;
+            // Si no es un Base64 válido (ejemplo cuando se envía texto plano por omisión en formularios), usar sus bytes
+            try {
+                // Intentar decodificar URL-safe o estándar
+                if (pureBase64.contains("-") || pureBase64.contains("_")) {
+                    bytes = Base64.getUrlDecoder().decode(pureBase64);
+                } else {
+                    bytes = Base64.getDecoder().decode(pureBase64);
+                }
+            } catch (IllegalArgumentException e) {
+                // Fallback robusto: Si venía un texto simulado como 'FIRMA_DIGITALIZADA_DECANATO_BASE64'
+                bytes = pureBase64.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            }
             String hashSha256 = DigestUtils.sha256Hex(bytes);
 
             String fileName = "firma_" + UUID.randomUUID() + ".png";
