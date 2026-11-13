@@ -1,0 +1,91 @@
+
+name: SonarCloud Analysis and GitHub Issues
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+jobs:
+  Analysis:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Descargar código
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Analizar código con SonarCloud
+      - name: Analyze with SonarCloud
+        uses: SonarSource/sonarcloud-github-action@4006f663ecaf1f8093e8e4abb9227f6041f52216
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=ematevar_ExmUnidad2-Prog3
+            -Dsonar.organization=ematevar
+          projectBaseDir: .
+
+      # Esperar procesamiento de SonarCloud
+      - name: Wait for SonarCloud processing
+        if: github.event_name != 'pull_request'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          REPORT_FILE=".scannerwork/report-task.txt"
+
+          if [ ! -f "$REPORT_FILE" ]; then
+            echo "No se encontró el reporte de SonarCloud"
+            exit 1
+          fi
+
+          CE_TASK_URL=$(grep '^ceTaskUrl=' "$REPORT_FILE" | cut -d'=' -f2-)
+
+          for i in {1..60}; do
+            RESPONSE=$(curl -fsS \
+              -H "Authorization: Bearer $SONAR_TOKEN" \
+              "$CE_TASK_URL")
+
+            STATUS=$(echo "$RESPONSE" | jq -r '.task.status')
+
+            echo "Estado SonarCloud: $STATUS"
+
+            if [ "$STATUS" = "SUCCESS" ]; then
+              echo "Análisis completado"
+              exit 0
+            fi
+
+            if [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELED" ]; then
+              echo "El análisis falló"
+              exit 1
+            fi
+
+            sleep 10
+          done
+
+          echo "Tiempo de espera agotado"
+          exit 1
+
+      # Crear tickets únicamente desde main
+      - name: Create GitHub Issues from SonarCloud
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          SONAR_HOST_URL: https://sonarcloud.io
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PROJECT_KEY: ematevar_ExmUnidad2-Prog3
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/sync-sonar.js
