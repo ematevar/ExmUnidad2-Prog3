@@ -77,6 +77,11 @@ public class EfjavPortalController {
         String userNombre = (String) session.getAttribute("AUTH_USER_NOMBRE");
         @SuppressWarnings("unchecked")
         List<String> roles = (List<String>) session.getAttribute("AUTH_USER_ROLES");
+        if (roles == null || roles.isEmpty()) {
+            // Fallback robusto desde BD si se perdió en la sesión
+            roles = efjavBibliotecaService.efjavMtdListarRolesUsuario(userId);
+            session.setAttribute("AUTH_USER_ROLES", roles);
+        }
         boolean esEstudiante = roles != null && roles.contains("ROLE_ESTUDIANTE");
         boolean esBiblioteca = roles != null && roles.contains("ROLE_BIBLIOTECA");
         boolean esDecano = roles != null && roles.contains("ROLE_DECANO");

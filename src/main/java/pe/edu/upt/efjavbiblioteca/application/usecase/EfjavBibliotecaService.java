@@ -23,6 +23,7 @@ public class EfjavBibliotecaService {
     private final EfjavLibroJpaRepository efjavLibroJpaRepository;
     private final EfjavPrestamoJpaRepository efjavPrestamoJpaRepository;
     private final EfjavPenalidadJpaRepository efjavPenalidadJpaRepository;
+    private final EfjavUsuarioJpaRepository efjavUsuarioJpaRepository;
     private final EfjavInfaAuditoriaRepository efjavAuditoriaRepository;
     private final EfjavNotificacionJpaRepository efjavNotificacionJpaRepository;
     private final EfjavStorageService efjavStorageService;
@@ -32,6 +33,7 @@ public class EfjavBibliotecaService {
     public EfjavBibliotecaService(EfjavLibroJpaRepository efjavLibroJpaRepository,
                                   EfjavPrestamoJpaRepository efjavPrestamoJpaRepository,
                                   EfjavPenalidadJpaRepository efjavPenalidadJpaRepository,
+                                  EfjavUsuarioJpaRepository efjavUsuarioJpaRepository,
                                   EfjavInfaAuditoriaRepository efjavAuditoriaRepository,
                                   EfjavNotificacionJpaRepository efjavNotificacionJpaRepository,
                                   EfjavStorageService efjavStorageService,
@@ -40,11 +42,18 @@ public class EfjavBibliotecaService {
         this.efjavLibroJpaRepository = efjavLibroJpaRepository;
         this.efjavPrestamoJpaRepository = efjavPrestamoJpaRepository;
         this.efjavPenalidadJpaRepository = efjavPenalidadJpaRepository;
+        this.efjavUsuarioJpaRepository = efjavUsuarioJpaRepository;
         this.efjavAuditoriaRepository = efjavAuditoriaRepository;
         this.efjavNotificacionJpaRepository = efjavNotificacionJpaRepository;
         this.efjavStorageService = efjavStorageService;
         this.efjavTimeService = efjavTimeService;
         this.efjavDispositivoSecurityService = efjavDispositivoSecurityService;
+    }
+
+    public List<String> efjavMtdListarRolesUsuario(Long usuarioId) {
+        return efjavUsuarioJpaRepository.findById(usuarioId)
+                .map(u -> u.getEfjavRoles().stream().map(EfjavRolEntity::getEfjavNombre).toList())
+                .orElse(List.of());
     }
 
     public List<EfjavLibroEntity> efjavMtdListarLibros() {

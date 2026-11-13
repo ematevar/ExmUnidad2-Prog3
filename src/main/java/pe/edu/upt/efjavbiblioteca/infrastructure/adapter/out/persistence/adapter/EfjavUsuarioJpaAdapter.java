@@ -47,7 +47,7 @@ public class EfjavUsuarioJpaAdapter implements EfjavInfaUsuarioRepository {
             entity = new EfjavUsuarioEntity();
         }
         efjavUsuarioMapper.efjavMtdUpdateEntity(efjavUsuario, entity);
-        EfjavUsuarioEntity guardado = efjavUsuarioJpaRepository.save(entity);
+        EfjavUsuarioEntity guardado = efjavUsuarioJpaRepository.saveAndFlush(entity);
         return efjavUsuarioMapper.efjavMtdToDomain(guardado);
     }
 }
