@@ -69,11 +69,12 @@
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 
-    <!-- Alerta de Penalidad Vigente si existe -->
-    <div th:if="${penalidadVigente != null}" class="alert alert-warning border-warning shadow-sm" role="alert">
+    <!-- Alerta de Penalidad Vigente (Solo para Estudiante con botón de cerrar opcional) -->
+    <div th:if="${esEstudiante and penalidadVigente != null}" class="alert alert-warning border-warning shadow-sm alert-dismissible fade show" role="alert">
         <h6 class="alert-heading fw-bold"><i class="bi bi-shield-slash-fill me-2"></i>ESTUDIANTE SUSPENDIDO EN BIBLIOTECA</h6>
         <p class="mb-1" th:text="${penalidadVigente.efjavReglaAplicada}"></p>
         <small class="text-muted" th:text="'Periodo de suspensión: ' + ${penalidadVigente.efjavFechaInicioSuspension} + ' al ' + ${penalidadVigente.efjavFechaFinSuspension} + ' (Días sanción: ' + ${penalidadVigente.efjavDiasSuspension} + ')'"></small>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
     </div>
 
     <!-- Pestañas Principales filtradas por ROL (Numeral 5: Usuarios, roles y restricciones) -->
