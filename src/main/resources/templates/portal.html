@@ -369,8 +369,8 @@
                                         </td>
                                         <td>
                                             <a th:href="'/tramites/documento/' + ${t.efjavId}" target="_blank" class="btn btn-outline-danger btn-sm py-0" title="Ver Solicitud PDF"><i class="bi bi-file-pdf"></i></a>
-                                            <button type="button" class="btn btn-outline-info btn-sm py-0" th:onclick="'cargarHistorial(' + ${t.efjavId} + ')'" title="Ver Historial / Trazabilidad"><i class="bi bi-clock-history"></i></button>
-                                            <button th:if="${t.efjavEstado == 'OBSERVADO'}" type="button" class="btn btn-warning btn-sm py-0" th:onclick="'abrirModalSubsanar(' + ${t.efjavId} + ', \'' + ${t.efjavCodigoSeguimiento} + '\')'" title="Subsanar Observación">
+                                            <button type="button" class="btn btn-outline-info btn-sm py-0" th:data-id="${t.efjavId}" onclick="cargarHistorial(this.getAttribute('data-id'))" title="Ver Historial / Trazabilidad"><i class="bi bi-clock-history"></i></button>
+                                            <button th:if="${t.efjavEstado == 'OBSERVADO'}" type="button" class="btn btn-warning btn-sm py-0" th:data-id="${t.efjavId}" th:data-codigo="${t.efjavCodigoSeguimiento}" onclick="abrirModalSubsanar(this.getAttribute('data-id'), this.getAttribute('data-codigo'))" title="Subsanar Observación">
                                                 <i class="bi bi-pencil-square"></i> Subsanar
                                             </button>
                                         </td>
@@ -565,7 +565,7 @@
                                 <td><span class="badge bg-success" th:text="${c.efjavEstado}"></span></td>
                                 <td>
                                     <a th:href="'/tramites/documento/' + ${c.efjavId}" target="_blank" class="btn btn-outline-danger btn-sm py-0"><i class="bi bi-file-pdf"></i> PDF</a>
-                                    <button type="button" class="btn btn-outline-info btn-sm py-0" th:onclick="'cargarHistorial(' + ${c.efjavId} + ')'"><i class="bi bi-clock-history"></i> Historial</button>
+                                    <button type="button" class="btn btn-outline-info btn-sm py-0" th:data-id="${c.efjavId}" onclick="cargarHistorial(this.getAttribute('data-id'))"><i class="bi bi-clock-history"></i> Historial</button>
                                 </td>
                             </tr>
                             <tr th:if="${#lists.isEmpty(culminados)}"><td colspan="7" class="text-center text-muted py-4">No hay trámites en este rango de fechas.</td></tr>
