@@ -75,6 +75,14 @@ public class EfjavPortalController {
         Long userId = (Long) session.getAttribute("AUTH_USER_ID");
         String userCodigo = (String) session.getAttribute("AUTH_USER_CODIGO");
         String userNombre = (String) session.getAttribute("AUTH_USER_NOMBRE");
+        @SuppressWarnings("unchecked")
+        List<String> roles = (List<String>) session.getAttribute("AUTH_USER_ROLES");
+        boolean esEstudiante = roles != null && roles.contains("ROLE_ESTUDIANTE");
+        boolean esBiblioteca = roles != null && roles.contains("ROLE_BIBLIOTECA");
+        boolean esDecano = roles != null && roles.contains("ROLE_DECANO");
+        boolean esEpis = roles != null && roles.contains("ROLE_EPIS");
+        boolean esCobranzas = roles != null && roles.contains("ROLE_COBRANZAS");
+        boolean esAdmin = roles != null && roles.contains("ROLE_ADMIN");
         
         // Obtener el token real de la máquina física
         String deviceToken = efjavDispositivoSecurityService.efjavMtdObtenerOGenerarTokenEquipo(request, response);
@@ -83,6 +91,13 @@ public class EfjavPortalController {
 
         model.addAttribute("userCodigo", userCodigo);
         model.addAttribute("userNombre", userNombre);
+        model.addAttribute("userRoles", roles);
+        model.addAttribute("esEstudiante", esEstudiante);
+        model.addAttribute("esBiblioteca", esBiblioteca);
+        model.addAttribute("esDecano", esDecano);
+        model.addAttribute("esEpis", esEpis);
+        model.addAttribute("esCobranzas", esCobranzas);
+        model.addAttribute("esAdmin", esAdmin);
         model.addAttribute("deviceToken", deviceToken);
         model.addAttribute("equipoEnrolado", equipoEnroladoOpt.orElse(null));
         model.addAttribute("esAutorizadoBiblioteca", efjavDispositivoSecurityService.efjavFncEsEquipoAutorizadoParaOficina(deviceToken, "BIBLIOTECA"));

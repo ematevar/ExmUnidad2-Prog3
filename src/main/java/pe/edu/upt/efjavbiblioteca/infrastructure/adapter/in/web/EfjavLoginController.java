@@ -75,6 +75,7 @@ public class EfjavLoginController {
         session.setAttribute("PENDING_2FA_USER_ID", usuarioAuth.getEfjavId());
         session.setAttribute("PENDING_2FA_USER_CODIGO", usuarioAuth.getEfjavCodigo());
         session.setAttribute("PENDING_2FA_USER_NOMBRE", usuarioAuth.getEfjavNombres());
+        session.setAttribute("PENDING_2FA_USER_ROLES", usuarioAuth.getEfjavRoles().stream().map(Enum::name).toList());
         session.setAttribute("PENDING_2FA_EQUIPO", deviceToken);
         session.setAttribute("PENDING_2FA_OTP_DEBUG", usuarioAuth.getEfjavOtpActual());
         session.setAttribute("PENDING_2FA_TOTP_SECRET", usuarioAuth.getEfjavTotpSecret());
@@ -141,6 +142,7 @@ public class EfjavLoginController {
         session.setAttribute("AUTH_USER_ID", userId);
         session.setAttribute("AUTH_USER_CODIGO", session.getAttribute("PENDING_2FA_USER_CODIGO"));
         session.setAttribute("AUTH_USER_NOMBRE", session.getAttribute("PENDING_2FA_USER_NOMBRE"));
+        session.setAttribute("AUTH_USER_ROLES", session.getAttribute("PENDING_2FA_USER_ROLES"));
         session.setAttribute("AUTH_EQUIPO_ID", deviceToken);
         session.setAttribute("AUTH_SESSION_TOKEN", sesionEntity.getEfjavSessionToken());
 
