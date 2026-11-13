@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -21,6 +22,7 @@ public class EfjavTramiteService {
 
     private final EfjavTramiteJpaRepository efjavTramiteJpaRepository;
     private final EfjavMovimientoTramiteJpaRepository efjavMovimientoJpaRepository;
+    private final EfjavDocumentoJpaRepository efjavDocumentoJpaRepository;
     private final EfjavNotificacionJpaRepository efjavNotificacionJpaRepository;
     private final EfjavInfaAuditoriaRepository efjavAuditoriaRepository;
     private final EfjavStorageService efjavStorageService;
@@ -28,16 +30,26 @@ public class EfjavTramiteService {
 
     public EfjavTramiteService(EfjavTramiteJpaRepository efjavTramiteJpaRepository,
                                EfjavMovimientoTramiteJpaRepository efjavMovimientoJpaRepository,
+                               EfjavDocumentoJpaRepository efjavDocumentoJpaRepository,
                                EfjavNotificacionJpaRepository efjavNotificacionJpaRepository,
                                EfjavInfaAuditoriaRepository efjavAuditoriaRepository,
                                EfjavStorageService efjavStorageService,
                                EfjavTimeService efjavTimeService) {
         this.efjavTramiteJpaRepository = efjavTramiteJpaRepository;
         this.efjavMovimientoJpaRepository = efjavMovimientoJpaRepository;
+        this.efjavDocumentoJpaRepository = efjavDocumentoJpaRepository;
         this.efjavNotificacionJpaRepository = efjavNotificacionJpaRepository;
         this.efjavAuditoriaRepository = efjavAuditoriaRepository;
         this.efjavStorageService = efjavStorageService;
         this.efjavTimeService = efjavTimeService;
+    }
+
+    public List<EfjavDocumentoEntity> efjavMtdObtenerDocumentos(Long tramiteId) {
+        return efjavDocumentoJpaRepository.findByEfjavTramiteId(tramiteId);
+    }
+
+    public Optional<EfjavDocumentoEntity> efjavMtdObtenerDocumentoPorId(Long documentoId) {
+        return efjavDocumentoJpaRepository.findById(documentoId);
     }
 
     public List<EfjavTramiteEntity> efjavMtdListarPorEstudiante(Long estudianteId) {
@@ -78,6 +90,7 @@ public class EfjavTramiteService {
 
         // Guardar archivo PDF con validación de MIME y cabecera
         String rutaPdf = efjavStorageService.efjavMtdGuardarArchivoPdf(documentoPdf, "tramites");
+        String hashPdf = DigestUtils.sha256Hex(documentoPdf.getBytes());
 
         // Guardar firma digitalizada
         EfjavFirmaEntity firma = efjavStorageService.efjavMtdGuardarFirmaBase64(
@@ -98,6 +111,16 @@ public class EfjavTramiteService {
         tramite.setEfjavFirmaEstudianteId(firma.getEfjavId());
 
         EfjavTramiteEntity guardado = efjavTramiteJpaRepository.save(tramite);
+
+        // Guardar registro del documento asociado
+        EfjavDocumentoEntity docEntity = new EfjavDocumentoEntity();
+        docEntity.setEfjavTramiteId(guardado.getEfjavId());
+        docEntity.setEfjavNombreOriginal(documentoPdf.getOriginalFilename());
+        docEntity.setEfjavRutaAlmacenamiento(rutaPdf);
+        docEntity.setEfjavTipoDocumento("SOLICITUD_PDF");
+        docEntity.setEfjavHashSha256(hashPdf);
+        docEntity.setEfjavTamanioBytes(documentoPdf.getSize());
+        efjavDocumentoJpaRepository.save(docEntity);
 
         // Registrar primer movimiento en el historial
         EfjavMovimientoTramiteEntity mov = new EfjavMovimientoTramiteEntity();

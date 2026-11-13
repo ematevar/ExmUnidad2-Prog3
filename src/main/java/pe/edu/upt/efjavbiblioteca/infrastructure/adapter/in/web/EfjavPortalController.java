@@ -1,19 +1,29 @@
 package pe.edu.upt.efjavbiblioteca.infrastructure.adapter.in.web;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pe.edu.upt.efjavbiblioteca.application.usecase.EfjavBibliotecaService;
+import pe.edu.upt.efjavbiblioteca.application.usecase.EfjavRecordatorioService;
 import pe.edu.upt.efjavbiblioteca.application.usecase.EfjavTramiteService;
 import pe.edu.upt.efjavbiblioteca.infrastructure.adapter.out.persistence.entity.*;
 import pe.edu.upt.efjavbiblioteca.infrastructure.adapter.out.persistence.repository.EfjavNotificacionJpaRepository;
 import pe.edu.upt.efjavbiblioteca.infrastructure.config.EfjavTimeService;
 
+import java.io.File;
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,15 +32,18 @@ public class EfjavPortalController {
 
     private final EfjavBibliotecaService efjavBibliotecaService;
     private final EfjavTramiteService efjavTramiteService;
+    private final EfjavRecordatorioService efjavRecordatorioService;
     private final EfjavNotificacionJpaRepository efjavNotificacionJpaRepository;
     private final EfjavTimeService efjavTimeService;
 
     public EfjavPortalController(EfjavBibliotecaService efjavBibliotecaService,
                                  EfjavTramiteService efjavTramiteService,
+                                 EfjavRecordatorioService efjavRecordatorioService,
                                  EfjavNotificacionJpaRepository efjavNotificacionJpaRepository,
                                  EfjavTimeService efjavTimeService) {
         this.efjavBibliotecaService = efjavBibliotecaService;
         this.efjavTramiteService = efjavTramiteService;
+        this.efjavRecordatorioService = efjavRecordatorioService;
         this.efjavNotificacionJpaRepository = efjavNotificacionJpaRepository;
         this.efjavTimeService = efjavTimeService;
     }
@@ -46,7 +59,10 @@ public class EfjavPortalController {
     }
 
     @GetMapping("/portal")
-    public String portal(HttpSession session, Model model) {
+    public String portal(@RequestParam(value = "fechaInicioFiltro", required = false) String fechaInicioFiltro,
+                         @RequestParam(value = "fechaFinFiltro", required = false) String fechaFinFiltro,
+                         @RequestParam(value = "criterioFiltro", required = false) String criterioFiltro,
+                         HttpSession session, Model model) {
         if (!validarSesion(session)) return "redirect:/login";
 
         Long userId = (Long) session.getAttribute("AUTH_USER_ID");
@@ -80,12 +96,54 @@ public class EfjavPortalController {
         model.addAttribute("bandejaEpis", efjavTramiteService.efjavMtdListarPorUbicacion(2L));
         model.addAttribute("bandejaCobranzas", efjavTramiteService.efjavMtdListarPorUbicacion(3L));
 
-        // Culminados (últimos 30 días)
+        // Culminados (Filtro por fechas - Numeral 6.14 y Prueba 18)
         LocalDateTime inicio = LocalDateTime.now().minusDays(30);
         LocalDateTime fin = LocalDateTime.now().plusDays(1);
+        if (fechaInicioFiltro != null && !fechaInicioFiltro.isEmpty()) {
+            inicio = LocalDate.parse(fechaInicioFiltro).atStartOfDay();
+        }
+        if (fechaFinFiltro != null && !fechaFinFiltro.isEmpty()) {
+            fin = LocalDate.parse(fechaFinFiltro).atTime(LocalTime.MAX);
+        }
+        model.addAttribute("fechaInicioFiltro", fechaInicioFiltro);
+        model.addAttribute("fechaFinFiltro", fechaFinFiltro);
         model.addAttribute("culminados", efjavTramiteService.efjavMtdListarCulminados(inicio, fin));
 
         return "portal";
+    }
+
+    // Ejecutar recordatorios de vencimiento bajo demanda (Prueba 19)
+    @GetMapping("/recordatorios/ejecutar")
+    public String ejecutarRecordatorios(RedirectAttributes redirectAttributes) {
+        int generados = efjavRecordatorioService.efjavMtdEjecutarBarridoRecordatorios();
+        redirectAttributes.addFlashAttribute("successMsg", "Barrido de recordatorios ejecutado: " + generados + " notificaciones generadas.");
+        return "redirect:/portal";
+    }
+
+    // Ver historial completo de un trámite
+    @GetMapping("/tramites/historial/{id}")
+    @ResponseBody
+    public List<EfjavMovimientoTramiteEntity> verHistorialTramite(@PathVariable("id") Long id) {
+        return efjavTramiteService.efjavMtdObtenerHistorial(id);
+    }
+
+    // Descargar/Visualizar PDF de un trámite (Prueba 10 y Numeral 6.14)
+    @GetMapping("/tramites/documento/{tramiteId}")
+    public ResponseEntity<Resource> descargarDocumento(@PathVariable("tramiteId") Long tramiteId) {
+        List<EfjavDocumentoEntity> docs = efjavTramiteService.efjavMtdObtenerDocumentos(tramiteId);
+        if (docs.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        EfjavDocumentoEntity doc = docs.get(0);
+        File file = new File(doc.getEfjavRutaAlmacenamiento());
+        if (!file.exists()) {
+            return ResponseEntity.notFound().build();
+        }
+        Resource resource = new FileSystemResource(file);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + doc.getEfjavNombreOriginal() + "\"")
+                .body(resource);
     }
 
     // Cambiar dinámicamente equipo simulado (para sustentación ágil)
