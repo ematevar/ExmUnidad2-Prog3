@@ -296,6 +296,28 @@ public class EfjavPortalController {
         return "redirect:/portal";
     }
 
+    // Subsanar trámite por el estudiante
+    @PostMapping("/tramites/subsanar")
+    public String subsanarTramite(@RequestParam("tramiteId") Long tramiteId,
+                                  @RequestParam("respuestaSubsanacion") String respuestaSubsanacion,
+                                  @RequestParam(value = "nuevoDocumentoPdf", required = false) MultipartFile nuevoDocumentoPdf,
+                                  @RequestParam("firmaEstudianteSubsanacion") String firmaEstudianteSubsanacion,
+                                  HttpSession session,
+                                  RedirectAttributes redirectAttributes) {
+        if (!validarSesion(session)) return "redirect:/login";
+        Long userId = (Long) session.getAttribute("AUTH_USER_ID");
+        String userCodigo = (String) session.getAttribute("AUTH_USER_CODIGO");
+        String equipo = (String) session.getAttribute("AUTH_EQUIPO_ID");
+
+        try {
+            efjavTramiteService.efjavMtdSubsanarTramite(tramiteId, userId, userCodigo, respuestaSubsanacion, nuevoDocumentoPdf, firmaEstudianteSubsanacion, "127.0.0.1", equipo);
+            redirectAttributes.addFlashAttribute("successMsg", "Subsanación enviada exitosamente. El expediente ha vuelto a la oficina correspondiente.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/portal";
+    }
+
     // Atender trámite en Facultad
     @PostMapping("/tramites/atender-facultad")
     public String atenderFacultad(@RequestParam("tramiteId") Long tramiteId,

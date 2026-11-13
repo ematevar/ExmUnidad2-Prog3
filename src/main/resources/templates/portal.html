@@ -364,10 +364,15 @@
                                             <span th:if="${t.efjavUbicacionActualId == 2}" class="badge bg-info text-dark">EPIS</span>
                                             <span th:if="${t.efjavUbicacionActualId == 3}" class="badge bg-secondary">Cobranzas</span>
                                         </td>
-                                        <td><span class="badge bg-primary" th:text="${t.efjavEstado}"></span></td>
                                         <td>
-                                            <a th:href="'/tramites/documento/' + ${t.efjavId}" target="_blank" class="btn btn-outline-danger btn-sm py-0"><i class="bi bi-file-pdf"></i></a>
-                                            <button type="button" class="btn btn-outline-info btn-sm py-0" th:onclick="'cargarHistorial(' + ${t.efjavId} + ')'"><i class="bi bi-clock-history"></i></button>
+                                            <span class="badge" th:classappend="${t.efjavEstado == 'OBSERVADO'} ? 'bg-warning text-dark' : 'bg-primary'" th:text="${t.efjavEstado}"></span>
+                                        </td>
+                                        <td>
+                                            <a th:href="'/tramites/documento/' + ${t.efjavId}" target="_blank" class="btn btn-outline-danger btn-sm py-0" title="Ver Solicitud PDF"><i class="bi bi-file-pdf"></i></a>
+                                            <button type="button" class="btn btn-outline-info btn-sm py-0" th:onclick="'cargarHistorial(' + ${t.efjavId} + ')'" title="Ver Historial / Trazabilidad"><i class="bi bi-clock-history"></i></button>
+                                            <button th:if="${t.efjavEstado == 'OBSERVADO'}" type="button" class="btn btn-warning btn-sm py-0" th:onclick="'abrirModalSubsanar(' + ${t.efjavId} + ', \'' + ${t.efjavCodigoSeguimiento} + '\')'" title="Subsanar Observación">
+                                                <i class="bi bi-pencil-square"></i> Subsanar
+                                            </button>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -400,6 +405,7 @@
                                         <div class="btn-group btn-group-sm w-100">
                                             <button type="submit" name="accion" value="APROBAR" class="btn btn-success"><i class="bi bi-check-lg"></i> Aprobar</button>
                                             <button type="submit" name="accion" value="DERIVAR_EPIS" class="btn btn-warning"><i class="bi bi-arrow-right"></i> Derivar EPIS</button>
+                                            <button type="submit" name="accion" value="DEVOLVER_OBSERVADO_ESTUDIANTE" class="btn btn-info text-white"><i class="bi bi-arrow-return-left"></i> Observar a Alumno</button>
                                             <button type="submit" name="accion" value="RECHAZAR" class="btn btn-danger"><i class="bi bi-x-lg"></i> Rechazar</button>
                                         </div>
                                     </form>
@@ -598,6 +604,45 @@
     </div>
 </div>
 
+<!-- Modal de Subsanación de Trámite Observado -->
+<div class="modal fade" id="modalSubsanar" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Subsanar Trámite Observado</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="/tramites/subsanar" method="post" enctype="multipart/form-data" onsubmit="prepararFirmaSubsanacion()">
+                <div class="modal-body">
+                    <input type="hidden" name="tramiteId" id="subsanarTramiteId">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Expediente:</label>
+                        <span id="subsanarCodigoSeguimiento" class="badge bg-dark fs-6"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Detalle de la Subsanación / Corrección:</label>
+                        <textarea name="respuestaSubsanacion" class="form-control" rows="3" placeholder="Indique qué subsanaciones o aclaraciones está presentando..." required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Adjuntar PDF Corregido (Opcional):</label>
+                        <input type="file" name="nuevoDocumentoPdf" class="form-control form-control-sm" accept="application/pdf">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label fw-semibold">Firma del Estudiante:</label>
+                        <canvas id="canvasFirmaSubsanacion" class="signature-box w-100" height="90"></canvas>
+                        <input type="hidden" name="firmaEstudianteSubsanacion" id="hiddenFirmaSubsanacion">
+                        <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="limpiarCanvas('canvasFirmaSubsanacion')">Limpiar Firma</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-send-check"></i> Enviar Subsanación</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Modal de Historial de Trámite -->
 <div class="modal fade" id="modalHistorial" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -618,6 +663,19 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    function abrirModalSubsanar(tramiteId, codigo) {
+        document.getElementById('subsanarTramiteId').value = tramiteId;
+        document.getElementById('subsanarCodigoSeguimiento').innerText = codigo;
+        const modal = new bootstrap.Modal(document.getElementById('modalSubsanar'));
+        modal.show();
+        setTimeout(() => inicializarCanvas('canvasFirmaSubsanacion'), 300);
+    }
+
+    function prepararFirmaSubsanacion() {
+        const c = document.getElementById('canvasFirmaSubsanacion');
+        document.getElementById('hiddenFirmaSubsanacion').value = (c && c.dataset.hasDrawing) ? c.toDataURL('image/png') : 'FIRMA_SUBSANACION_ESTUDIANTE';
+    }
+
     function cargarHistorial(tramiteId) {
         fetch('/tramites/historial/' + tramiteId)
             .then(res => res.json())

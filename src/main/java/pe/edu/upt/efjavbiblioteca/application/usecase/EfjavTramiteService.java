@@ -183,6 +183,13 @@ public class EfjavTramiteService {
             mov.setEfjavInstanciaDestinoId(1L);
             mov.setEfjavEstadoResultante("RECHAZADO");
             efjavMtdNotificarEstudiante(tramite.getEfjavEstudianteId(), "Trámite Rechazado", "Su expediente " + tramite.getEfjavCodigoSeguimiento() + " ha sido rechazado. Motivo: " + observacion);
+        } else if ("DEVOLVER_OBSERVADO_ESTUDIANTE".equalsIgnoreCase(accion)) {
+            // Facultad traslada la observación al estudiante para que subsane
+            tramite.setEfjavEstado("OBSERVADO");
+            mov.setEfjavInstanciaDestinoId(1L);
+            mov.setEfjavEstadoResultante("OBSERVADO_AL_ESTUDIANTE");
+            efjavMtdNotificarEstudiante(tramite.getEfjavEstudianteId(), "Trámite Observado - Requiere Subsanación",
+                    "Su expediente " + tramite.getEfjavCodigoSeguimiento() + " ha sido observado. Por favor subsane las observaciones: " + observacion);
         }
 
         efjavMovimientoJpaRepository.save(mov);
@@ -285,6 +292,59 @@ public class EfjavTramiteService {
                 "Atención Cobranzas: " + accion + " expediente: " + tramite.getEfjavCodigoSeguimiento(), ip, equipo, "EXITOSO");
 
         return actualizado;
+    }
+
+    // Subsanar trámite observado por parte del estudiante (reingreso al ciclo y traza)
+    @Transactional
+    public EfjavTramiteEntity efjavMtdSubsanarTramite(Long tramiteId, Long estudianteId, String estudianteCodigo,
+                                                      String respuestaSubsanacion, MultipartFile nuevoDocumentoPdf,
+                                                      String firmaBase64, String ip, String equipo) throws IOException {
+        EfjavTramiteEntity tramite = efjavTramiteJpaRepository.findById(tramiteId)
+                .orElseThrow(() -> new IllegalArgumentException("Trámite no encontrado"));
+
+        if (!tramite.getEfjavEstudianteId().equals(estudianteId)) {
+            throw new IllegalStateException("Solo el estudiante titular puede subsanar su expediente.");
+        }
+
+        if (!"OBSERVADO".equalsIgnoreCase(tramite.getEfjavEstado())) {
+            throw new IllegalStateException("El trámite no se encuentra en estado OBSERVADO.");
+        }
+
+        if (nuevoDocumentoPdf != null && !nuevoDocumentoPdf.isEmpty()) {
+            String ruta = efjavStorageService.efjavMtdGuardarArchivoPdf(nuevoDocumentoPdf, "tramites");
+            EfjavDocumentoEntity doc = new EfjavDocumentoEntity();
+            doc.setEfjavTramiteId(tramite.getEfjavId());
+            doc.setEfjavNombreOriginal(nuevoDocumentoPdf.getOriginalFilename());
+            doc.setEfjavRutaAlmacenamiento(ruta);
+            doc.setEfjavTipoDocumento("SUBSANACION_PDF");
+            doc.setEfjavVersion(2);
+            doc.setEfjavHashSha256(DigestUtils.sha256Hex(nuevoDocumentoPdf.getBytes()));
+            doc.setEfjavTamanioBytes(nuevoDocumentoPdf.getSize());
+            efjavDocumentoJpaRepository.save(doc);
+        }
+
+        EfjavFirmaEntity firma = efjavStorageService.efjavMtdGuardarFirmaBase64(
+                estudianteId, "Estudiante", "ESTUDIANTE", firmaBase64, "SUBSANACION_TRAMITE"
+        );
+
+        // Regresar el trámite a estado EN_PROCESO en la oficina donde se observó
+        tramite.setEfjavEstado("EN_PROCESO");
+        EfjavTramiteEntity guardado = efjavTramiteJpaRepository.save(tramite);
+
+        EfjavMovimientoTramiteEntity mov = new EfjavMovimientoTramiteEntity();
+        mov.setEfjavTramiteId(tramite.getEfjavId());
+        mov.setEfjavInstanciaOrigenId(tramite.getEfjavUbicacionActualId());
+        mov.setEfjavInstanciaDestinoId(tramite.getEfjavUbicacionActualId());
+        mov.setEfjavResponsableId(estudianteId);
+        mov.setEfjavFirmaResponsableId(firma.getEfjavId());
+        mov.setEfjavEstadoResultante("SUBSANADO");
+        mov.setEfjavObservacion("Estudiante subsanó: " + respuestaSubsanacion);
+        efjavMovimientoJpaRepository.save(mov);
+
+        efjavAuditoriaRepository.efjavMtdRegistrar(estudianteCodigo, "SUBSANAR_TRAMITE", "TRAMITE",
+                "Subsanación presentada para expediente: " + tramite.getEfjavCodigoSeguimiento(), ip, equipo, "EXITOSO");
+
+        return guardado;
     }
 
     private void efjavMtdNotificarEstudiante(Long estudianteId, String titulo, String contenido) {
