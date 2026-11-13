@@ -606,26 +606,64 @@
     function inicializarCanvas(id) {
         const canvas = document.getElementById(id);
         if (!canvas) return null;
+
+        // Fijar dimensiones reales de píxeles internas para evitar desfases de escala
+        if (!canvas.getAttribute('width')) canvas.width = canvas.offsetWidth || 300;
+        if (!canvas.getAttribute('height')) canvas.height = canvas.offsetHeight || 100;
+
         const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
         let painting = false;
 
-        function startPosition(e) { painting = true; draw(e); }
-        function endPosition() { painting = false; ctx.beginPath(); }
-        function draw(e) {
-            if (!painting) return;
+        function getPos(e) {
             const rect = canvas.getBoundingClientRect();
-            ctx.lineWidth = 2;
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = '#000';
-            ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: (clientX - rect.left) * (canvas.width / rect.width),
+                y: (clientY - rect.top) * (canvas.height / rect.height)
+            };
         }
 
+        function startPosition(e) {
+            e.preventDefault();
+            painting = true;
+            canvas.dataset.hasDrawing = "true";
+            const pos = getPos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+        }
+
+        function endPosition(e) {
+            if (e) e.preventDefault();
+            painting = false;
+            ctx.beginPath();
+        }
+
+        function draw(e) {
+            if (!painting) return;
+            e.preventDefault();
+            const pos = getPos(e);
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#000000';
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+        }
+
+        // Soporte Mouse
         canvas.addEventListener('mousedown', startPosition);
-        canvas.addEventListener('mouseup', endPosition);
+        window.addEventListener('mouseup', endPosition);
         canvas.addEventListener('mousemove', draw);
+
+        // Soporte Touch (móvil, tablet o laptops táctiles)
+        canvas.addEventListener('touchstart', startPosition, { passive: false });
+        window.addEventListener('touchend', endPosition, { passive: false });
+        canvas.addEventListener('touchmove', draw, { passive: false });
+
         return canvas;
     }
 
@@ -633,35 +671,58 @@
         const c = document.getElementById(id);
         if (c) {
             const ctx = c.getContext('2d');
-            ctx.clearRect(0, 0, c.width, c.height);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, c.width, c.height);
+            delete c.dataset.hasDrawing;
+        }
+    }
+
+    function configurarCanvasVisible(id) {
+        const c = document.getElementById(id);
+        if (c) {
+            c.width = c.offsetWidth || 280;
+            c.height = c.offsetHeight || 90;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, c.width, c.height);
         }
     }
 
     window.addEventListener('load', () => {
-        inicializarCanvas('canvasFirmaEst');
-        inicializarCanvas('canvasFirmaBib');
-        inicializarCanvas('canvasFirmaDevEst');
-        inicializarCanvas('canvasFirmaDevBib');
-        inicializarCanvas('canvasFirmaTramite');
+        ['canvasFirmaEst', 'canvasFirmaBib', 'canvasFirmaDevEst', 'canvasFirmaDevBib', 'canvasFirmaTramite'].forEach(id => {
+            inicializarCanvas(id);
+        });
+
+        // Reajustar cuando se cambie de pestaña Bootstrap (pestañas inactivas tienen width 0 al inicio)
+        document.querySelectorAll('button[data-bs-toggle="pill"]').forEach(tab => {
+            tab.addEventListener('shown.bs.tab', () => {
+                ['canvasFirmaEst', 'canvasFirmaBib', 'canvasFirmaDevEst', 'canvasFirmaDevBib', 'canvasFirmaTramite'].forEach(id => {
+                    const c = document.getElementById(id);
+                    if (c && !c.dataset.hasDrawing) {
+                        configurarCanvasVisible(id);
+                    }
+                });
+            });
+        });
     });
 
     function prepararFirmasPrestamo() {
         const c1 = document.getElementById('canvasFirmaEst');
         const c2 = document.getElementById('canvasFirmaBib');
-        document.getElementById('hiddenFirmaEst').value = c1 ? c1.toDataURL() : 'FIRMA_BASE64_SIMULADA_EST';
-        document.getElementById('hiddenFirmaBib').value = c2 ? c2.toDataURL() : 'FIRMA_BASE64_SIMULADA_BIB';
+        document.getElementById('hiddenFirmaEst').value = (c1 && c1.dataset.hasDrawing) ? c1.toDataURL('image/png') : 'FIRMA_DIGITAL_ESTUDIANTE_REGISTRADA';
+        document.getElementById('hiddenFirmaBib').value = (c2 && c2.dataset.hasDrawing) ? c2.toDataURL('image/png') : 'FIRMA_DIGITAL_BIBLIOTECARIO_REGISTRADA';
     }
 
     function prepararFirmasDevolucion() {
         const c1 = document.getElementById('canvasFirmaDevEst');
         const c2 = document.getElementById('canvasFirmaDevBib');
-        document.getElementById('hiddenFirmaDevEst').value = c1 ? c1.toDataURL() : 'FIRMA_DEV_EST';
-        document.getElementById('hiddenFirmaDevBib').value = c2 ? c2.toDataURL() : 'FIRMA_DEV_BIB';
+        document.getElementById('hiddenFirmaDevEst').value = (c1 && c1.dataset.hasDrawing) ? c1.toDataURL('image/png') : 'FIRMA_DEV_ESTUDIANTE_REGISTRADA';
+        document.getElementById('hiddenFirmaDevBib').value = (c2 && c2.dataset.hasDrawing) ? c2.toDataURL('image/png') : 'FIRMA_DEV_BIBLIOTECARIO_REGISTRADA';
     }
 
     function prepararFirmaTramite() {
         const c = document.getElementById('canvasFirmaTramite');
-        document.getElementById('hiddenFirmaTramite').value = c ? c.toDataURL() : 'FIRMA_TRAMITE_EST';
+        document.getElementById('hiddenFirmaTramite').value = (c && c.dataset.hasDrawing) ? c.toDataURL('image/png') : 'FIRMA_TRAMITE_ESTUDIANTE_REGISTRADA';
     }
 </script>
 </body>
