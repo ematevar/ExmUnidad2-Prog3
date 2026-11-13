@@ -8,6 +8,7 @@ import pe.edu.upt.efjavbiblioteca.domain.port.out.EfjavInfaAuditoriaRepository;
 import pe.edu.upt.efjavbiblioteca.infrastructure.adapter.out.persistence.entity.*;
 import pe.edu.upt.efjavbiblioteca.infrastructure.adapter.out.persistence.repository.*;
 import pe.edu.upt.efjavbiblioteca.infrastructure.config.EfjavTimeService;
+import pe.edu.upt.efjavbiblioteca.infrastructure.security.EfjavDispositivoSecurityService;
 import pe.edu.upt.efjavbiblioteca.infrastructure.storage.EfjavStorageService;
 
 import java.io.IOException;
@@ -27,6 +28,7 @@ public class EfjavTramiteService {
     private final EfjavInfaAuditoriaRepository efjavAuditoriaRepository;
     private final EfjavStorageService efjavStorageService;
     private final EfjavTimeService efjavTimeService;
+    private final EfjavDispositivoSecurityService efjavDispositivoSecurityService;
 
     public EfjavTramiteService(EfjavTramiteJpaRepository efjavTramiteJpaRepository,
                                EfjavMovimientoTramiteJpaRepository efjavMovimientoJpaRepository,
@@ -34,7 +36,8 @@ public class EfjavTramiteService {
                                EfjavNotificacionJpaRepository efjavNotificacionJpaRepository,
                                EfjavInfaAuditoriaRepository efjavAuditoriaRepository,
                                EfjavStorageService efjavStorageService,
-                               EfjavTimeService efjavTimeService) {
+                               EfjavTimeService efjavTimeService,
+                               EfjavDispositivoSecurityService efjavDispositivoSecurityService) {
         this.efjavTramiteJpaRepository = efjavTramiteJpaRepository;
         this.efjavMovimientoJpaRepository = efjavMovimientoJpaRepository;
         this.efjavDocumentoJpaRepository = efjavDocumentoJpaRepository;
@@ -42,6 +45,7 @@ public class EfjavTramiteService {
         this.efjavAuditoriaRepository = efjavAuditoriaRepository;
         this.efjavStorageService = efjavStorageService;
         this.efjavTimeService = efjavTimeService;
+        this.efjavDispositivoSecurityService = efjavDispositivoSecurityService;
     }
 
     public List<EfjavDocumentoEntity> efjavMtdObtenerDocumentos(Long tramiteId) {
@@ -143,9 +147,9 @@ public class EfjavTramiteService {
     public EfjavTramiteEntity efjavMtdAtenderEnFacultad(Long tramiteId, Long decanoId, String decanoCodigo,
                                                         String accion, String observacion, String firmaDecanoBase64,
                                                         String ip, String equipo) {
-        // RN07: Requiere PC asignada
-        if (!"PC-DEC-01".equalsIgnoreCase(equipo)) {
-            throw new IllegalStateException("Operación restringida: La atención y decisión de Facultad solo puede realizarse desde la PC asignada (PC-DEC-01).");
+        // RN07: Requiere PC asignada real de Facultad
+        if (!efjavDispositivoSecurityService.efjavFncEsEquipoAutorizadoParaOficina(equipo, "FACULTAD")) {
+            throw new IllegalStateException("Operación restringida: Este equipo físico no está autorizado para tramitar documentos del Decanato (RN07).");
         }
 
         EfjavTramiteEntity tramite = efjavTramiteJpaRepository.findById(tramiteId)
@@ -195,9 +199,9 @@ public class EfjavTramiteService {
     public EfjavTramiteEntity efjavMtdAtenderEnEpis(Long tramiteId, Long directorId, String directorCodigo,
                                                     String accion, String observacion, String firmaDirectorBase64,
                                                     String ip, String equipo) {
-        // RN07: Requiere PC asignada
-        if (!"PC-EPI-01".equalsIgnoreCase(equipo)) {
-            throw new IllegalStateException("Operación restringida: La atención en Dirección EPIS requiere su PC asignada (PC-EPI-01).");
+        // RN07: Requiere PC asignada real de EPIS
+        if (!efjavDispositivoSecurityService.efjavFncEsEquipoAutorizadoParaOficina(equipo, "EPIS")) {
+            throw new IllegalStateException("Operación restringida: Este equipo físico no está autorizado para trámites de Dirección EPIS (RN07).");
         }
 
         EfjavTramiteEntity tramite = efjavTramiteJpaRepository.findById(tramiteId)
@@ -242,8 +246,9 @@ public class EfjavTramiteService {
     public EfjavTramiteEntity efjavMtdAtenderEnCobranzas(Long tramiteId, Long responsableId, String responsableCodigo,
                                                          String accion, String observacion, String firmaBase64,
                                                          String ip, String equipo) {
-        if (!"PC-COB-01".equalsIgnoreCase(equipo)) {
-            throw new IllegalStateException("Operación restringida: Cobranzas solo puede atender desde la PC autorizada (PC-COB-01).");
+        // Cobranzas: Requiere equipo asignado real
+        if (!efjavDispositivoSecurityService.efjavFncEsEquipoAutorizadoParaOficina(equipo, "COBRANZAS")) {
+            throw new IllegalStateException("Operación restringida: Este equipo físico no está enrolado ni autorizado para Cobranzas.");
         }
 
         EfjavTramiteEntity tramite = efjavTramiteJpaRepository.findById(tramiteId)

@@ -7,6 +7,7 @@ import pe.edu.upt.efjavbiblioteca.domain.port.out.EfjavInfaAuditoriaRepository;
 import pe.edu.upt.efjavbiblioteca.infrastructure.adapter.out.persistence.entity.*;
 import pe.edu.upt.efjavbiblioteca.infrastructure.adapter.out.persistence.repository.*;
 import pe.edu.upt.efjavbiblioteca.infrastructure.config.EfjavTimeService;
+import pe.edu.upt.efjavbiblioteca.infrastructure.security.EfjavDispositivoSecurityService;
 import pe.edu.upt.efjavbiblioteca.infrastructure.storage.EfjavStorageService;
 
 import java.time.LocalDate;
@@ -26,6 +27,7 @@ public class EfjavBibliotecaService {
     private final EfjavNotificacionJpaRepository efjavNotificacionJpaRepository;
     private final EfjavStorageService efjavStorageService;
     private final EfjavTimeService efjavTimeService;
+    private final EfjavDispositivoSecurityService efjavDispositivoSecurityService;
 
     public EfjavBibliotecaService(EfjavLibroJpaRepository efjavLibroJpaRepository,
                                   EfjavPrestamoJpaRepository efjavPrestamoJpaRepository,
@@ -33,7 +35,8 @@ public class EfjavBibliotecaService {
                                   EfjavInfaAuditoriaRepository efjavAuditoriaRepository,
                                   EfjavNotificacionJpaRepository efjavNotificacionJpaRepository,
                                   EfjavStorageService efjavStorageService,
-                                  EfjavTimeService efjavTimeService) {
+                                  EfjavTimeService efjavTimeService,
+                                  EfjavDispositivoSecurityService efjavDispositivoSecurityService) {
         this.efjavLibroJpaRepository = efjavLibroJpaRepository;
         this.efjavPrestamoJpaRepository = efjavPrestamoJpaRepository;
         this.efjavPenalidadJpaRepository = efjavPenalidadJpaRepository;
@@ -41,6 +44,7 @@ public class EfjavBibliotecaService {
         this.efjavNotificacionJpaRepository = efjavNotificacionJpaRepository;
         this.efjavStorageService = efjavStorageService;
         this.efjavTimeService = efjavTimeService;
+        this.efjavDispositivoSecurityService = efjavDispositivoSecurityService;
     }
 
     public List<EfjavLibroEntity> efjavMtdListarLibros() {
@@ -111,9 +115,9 @@ public class EfjavBibliotecaService {
     public EfjavPrestamoEntity efjavMtdConfirmarPrestamoConDosFirmas(Long prestamoId, Long bibliotecarioId, String bibliotecarioCodigo,
                                                                     String firmaEstudianteBase64, String firmaBibliotecarioBase64,
                                                                     String ip, String equipo) {
-        // RN06: Verificar equipo autorizado
-        if (!"PC-BIB-01".equalsIgnoreCase(equipo)) {
-            throw new IllegalStateException("Operación restringida: Las operaciones de atención de Biblioteca requieren la PC autorizada (PC-BIB-01).");
+        // RN06: Verificar equipo autorizado real mediante enrolamiento
+        if (!efjavDispositivoSecurityService.efjavFncEsEquipoAutorizadoParaOficina(equipo, "BIBLIOTECA")) {
+            throw new IllegalStateException("Operación restringida: Este equipo físico no se encuentra enrolado ni autorizado para operar como PC de Biblioteca (RN06).");
         }
 
         // RN04: Verificar horario de atención
@@ -172,8 +176,8 @@ public class EfjavBibliotecaService {
                                                           String firmaEstudianteBase64, String firmaBibliotecarioBase64,
                                                           String estadoFisico, String observacion, Integer diasRetrasoManual,
                                                           String ip, String equipo) {
-        if (!"PC-BIB-01".equalsIgnoreCase(equipo)) {
-            throw new IllegalStateException("Operación restringida: Las devoluciones requieren la PC autorizada de Biblioteca.");
+        if (!efjavDispositivoSecurityService.efjavFncEsEquipoAutorizadoParaOficina(equipo, "BIBLIOTECA")) {
+            throw new IllegalStateException("Operación restringida: Las devoluciones requieren un equipo físico enrolado y autorizado para Biblioteca.");
         }
 
         if (firmaEstudianteBase64 == null || firmaBibliotecarioBase64 == null) {

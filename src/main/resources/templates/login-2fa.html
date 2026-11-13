@@ -49,7 +49,7 @@
         <div class="text-center mb-3">
             <p class="mb-1 text-muted">Usuario identificado:</p>
             <h6 class="fw-bold" th:text="${nombreUsuario} + ' (' + ${codigoUsuario} + ')'"></h6>
-            <span class="badge bg-secondary" th:text="'Equipo: ' + ${equipoSimulado}"></span>
+            <div class="small text-muted font-monospace text-truncate" th:text="'Equipo: ' + ${deviceToken}"></div>
         </div>
 
         <div th:if="${errorMsg}" class="alert alert-danger py-2" role="alert">

@@ -72,17 +72,13 @@
             </div>
 
             <div class="mb-3 p-2 bg-light rounded border">
-                <label class="form-label fw-semibold text-secondary mb-1 d-flex justify-content-between align-items-center">
-                    <span><i class="bi bi-pc-display me-1"></i> Equipo Simulado (PC Enrolada)</span>
-                </label>
-                <select name="equipoSimulado" id="equipoSelect" class="form-select form-select-sm">
-                    <option value="PC-BIB-01">PC-BIB-01 (Autorizada Biblioteca)</option>
-                    <option value="PC-DEC-01">PC-DEC-01 (Autorizada Decanato)</option>
-                    <option value="PC-EPI-01">PC-EPI-01 (Autorizada EPIS)</option>
-                    <option value="PC-COB-01">PC-COB-01 (Autorizada Cobranzas)</option>
-                    <option value="PC-EXTERNA-01" selected>PC-EXTERNA-01 (PC no autorizada / Alumno)</option>
-                </select>
-                <small class="text-muted" style="font-size: 0.75rem;">Para probar permisos y regla de PC asignada</small>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="small fw-bold text-dark"><i class="bi bi-laptop me-1"></i> Identificador de Equipo Físico:</span>
+                    <span th:if="${equipoEnrolado != null}" class="badge bg-success" th:text="${equipoEnrolado.efjavOficina}"></span>
+                    <span th:if="${equipoEnrolado == null}" class="badge bg-secondary">No Enrolado (PC Externa)</span>
+                </div>
+                <div class="font-monospace text-muted small text-truncate" th:text="${deviceToken}"></div>
+                <small class="text-muted" style="font-size: 0.75rem;">Reconocimiento real por token único persistente del dispositivo.</small>
             </div>
 
             <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold">
@@ -93,20 +89,19 @@
         <hr class="my-3">
         <div class="text-center">
             <small class="text-muted d-block mb-1">Acceso rápido para prueba de roles (Contraseña: 123456):</small>
-            <span class="badge bg-primary badge-role" onclick="llenar('20210001', 'PC-EXTERNA-01')">Estudiante</span>
-            <span class="badge bg-success badge-role" onclick="llenar('BIB001', 'PC-BIB-01')">Biblioteca</span>
-            <span class="badge bg-warning text-dark badge-role" onclick="llenar('DEC001', 'PC-DEC-01')">Decano</span>
-            <span class="badge bg-info text-dark badge-role" onclick="llenar('EPI001', 'PC-EPI-01')">EPIS</span>
-            <span class="badge bg-secondary badge-role" onclick="llenar('COB001', 'PC-COB-01')">Cobranzas</span>
+            <span class="badge bg-primary badge-role" onclick="llenar('20210001')">Estudiante</span>
+            <span class="badge bg-success badge-role" onclick="llenar('BIB001')">Biblioteca</span>
+            <span class="badge bg-warning text-dark badge-role" onclick="llenar('DEC001')">Decano</span>
+            <span class="badge bg-info text-dark badge-role" onclick="llenar('EPI001')">EPIS</span>
+            <span class="badge bg-secondary badge-role" onclick="llenar('COB001')">Cobranzas</span>
         </div>
     </div>
 </div>
 
 <script>
-    function llenar(usr, pc) {
+    function llenar(usr) {
         document.getElementById('usuarioInput').value = usr;
         document.getElementById('passwordInput').value = '123456';
-        document.getElementById('equipoSelect').value = pc;
     }
 </script>
 </body>

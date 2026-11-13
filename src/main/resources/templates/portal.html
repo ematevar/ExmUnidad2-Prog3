@@ -37,18 +37,17 @@
             <i class="bi bi-mortarboard-fill me-2 fs-4"></i> UPT - Sistema Integral
         </a>
         <div class="d-flex align-items-center text-white">
-            <!-- Selector interactivo de Equipo Simulado -->
-            <form action="/simular-equipo" method="post" class="d-flex align-items-center me-3 bg-white text-dark px-2 py-1 rounded shadow-sm">
-                <i class="bi bi-pc-display me-1 text-primary"></i>
-                <span class="small fw-semibold me-2">Equipo:</span>
-                <select name="nuevoEquipo" class="form-select form-select-sm border-0 bg-transparent fw-bold text-primary" onchange="this.form.submit()">
-                    <option value="PC-EXTERNA-01" th:selected="${equipo == 'PC-EXTERNA-01'}">PC-EXTERNA-01 (Alumno / Externa)</option>
-                    <option value="PC-BIB-01" th:selected="${equipo == 'PC-BIB-01'}">PC-BIB-01 (Asignada Biblioteca)</option>
-                    <option value="PC-DEC-01" th:selected="${equipo == 'PC-DEC-01'}">PC-DEC-01 (Asignada Decanato)</option>
-                    <option value="PC-EPI-01" th:selected="${equipo == 'PC-EPI-01'}">PC-EPI-01 (Asignada EPIS)</option>
-                    <option value="PC-COB-01" th:selected="${equipo == 'PC-COB-01'}">PC-COB-01 (Asignada Cobranzas)</option>
-                </select>
-            </form>
+            <!-- Estado real del equipo físico -->
+            <div class="me-3 bg-white text-dark px-3 py-1 rounded shadow-sm d-flex align-items-center">
+                <i class="bi bi-shield-check me-2 fs-5" th:classappend="${equipoEnrolado != null} ? 'text-success' : 'text-secondary'"></i>
+                <div>
+                    <div class="small fw-bold">
+                        <span th:if="${equipoEnrolado != null}" class="text-success" th:text="'Equipo Autorizado: ' + ${equipoEnrolado.efjavOficina}"></span>
+                        <span th:if="${equipoEnrolado == null}" class="text-secondary">Equipo No Enrolado (PC Externa)</span>
+                    </div>
+                    <div class="font-monospace text-muted" style="font-size: 0.65rem;" th:text="${deviceToken}"></div>
+                </div>
+            </div>
 
             <div class="me-3 text-end d-none d-md-block">
                 <div class="fw-semibold small" th:text="${userNombre}"></div>
@@ -90,6 +89,9 @@
         </li>
         <li class="nav-item">
             <button class="nav-link fw-semibold" id="tab-oficinas" data-bs-toggle="pill" data-bs-target="#content-oficinas" type="button"><i class="bi bi-building-gear me-1"></i> Bandeja Oficinas (Facultad / EPIS / Cobranzas)</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link fw-semibold" id="tab-enrolamiento" data-bs-toggle="pill" data-bs-target="#content-enrolamiento" type="button"><i class="bi bi-pc-display-horizontal me-1"></i> Enrolamiento de Equipo</button>
         </li>
         <li class="nav-item">
             <button class="nav-link fw-semibold" id="tab-culminados" data-bs-toggle="pill" data-bs-target="#content-culminados" type="button"><i class="bi bi-archive me-1"></i> Culminados</button>
@@ -183,8 +185,8 @@
                 <div class="col-lg-5">
                     <div class="card shadow-sm border-0">
                         <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
-                            <span><i class="bi bi-gear-fill me-2 text-secondary"></i>Atención en Biblioteca (Requiere PC-BIB-01)</span>
-                            <span class="badge" th:classappend="${equipo == 'PC-BIB-01'} ? 'bg-success' : 'bg-danger'" th:text="${equipo == 'PC-BIB-01'} ? 'PC Autorizada' : 'No Autorizada'"></span>
+                            <span><i class="bi bi-gear-fill me-2 text-secondary"></i>Atención en Biblioteca</span>
+                            <span class="badge" th:classappend="${esAutorizadoBiblioteca} ? 'bg-success' : 'bg-danger'" th:text="${esAutorizadoBiblioteca} ? 'Equipo Físico Autorizado' : 'Equipo No Autorizado'"></span>
                         </div>
                         <div class="card-body">
                             <h6 class="fw-bold mb-2">1. Despacho / Entrega de Libro (Doble Firma):</h6>
@@ -208,7 +210,7 @@
                                         <input type="hidden" name="firmaBibliotecario" id="hiddenFirmaBib">
                                     </div>
                                 </div>
-                                <button type="submit" class="btn btn-success btn-sm w-100 mb-3" th:disabled="${equipo != 'PC-BIB-01'}">
+                                <button type="submit" class="btn btn-success btn-sm w-100 mb-3" th:disabled="${!esAutorizadoBiblioteca}">
                                     <i class="bi bi-check2-circle"></i> Confirmar Préstamo (2 Firmas)
                                 </button>
                             </form>
@@ -252,7 +254,7 @@
                                         <input type="hidden" name="firmaBibliotecario" id="hiddenFirmaDevBib">
                                     </div>
                                 </div>
-                                <button type="submit" class="btn btn-warning btn-sm w-100" th:disabled="${equipo != 'PC-BIB-01'}">
+                                <button type="submit" class="btn btn-warning btn-sm w-100" th:disabled="${!esAutorizadoBiblioteca}">
                                     <i class="bi bi-arrow-return-left"></i> Procesar Devolución
                                 </button>
                             </form>
@@ -346,13 +348,13 @@
                     <div class="card shadow-sm border-0 h-100">
                         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                             <span><i class="bi bi-bank me-1"></i> Decanato Facultad</span>
-                            <span class="badge" th:classappend="${equipo == 'PC-DEC-01'} ? 'bg-success' : 'bg-dark'" th:text="${equipo == 'PC-DEC-01'} ? 'PC Habilitada' : 'Solo Consulta'"></span>
+                            <span class="badge" th:classappend="${esAutorizadoFacultad} ? 'bg-success' : 'bg-dark'" th:text="${esAutorizadoFacultad} ? 'PC Asignada Habilitada' : 'Solo Consulta'"></span>
                         </div>
                         <div class="card-body p-2">
                             <div th:each="t : ${bandejaFacultad}" class="border rounded p-2 mb-2 bg-light">
                                 <div class="fw-bold text-primary" th:text="${t.efjavCodigoSeguimiento} + ' - ' + ${t.efjavTipoTramite}"></div>
                                 <div class="small text-muted" th:text="${t.efjavAsunto}"></div>
-                                <div class="mt-2" th:if="${equipo == 'PC-DEC-01'}">
+                                <div class="mt-2" th:if="${esAutorizadoFacultad}">
                                     <form action="/tramites/atender-facultad" method="post" class="mt-1" onsubmit="prepararFirmaDecano(this)">
                                         <input type="hidden" name="tramiteId" th:value="${t.efjavId}">
                                         <input type="text" name="observacion" class="form-control form-control-sm mb-1" placeholder="Observación / Proveído">
@@ -375,13 +377,13 @@
                     <div class="card shadow-sm border-0 h-100">
                         <div class="card-header bg-info text-dark d-flex justify-content-between align-items-center">
                             <span><i class="bi bi-laptop me-1"></i> Dirección EPIS</span>
-                            <span class="badge" th:classappend="${equipo == 'PC-EPI-01'} ? 'bg-success' : 'bg-dark'" th:text="${equipo == 'PC-EPI-01'} ? 'PC Habilitada' : 'Solo Consulta'"></span>
+                            <span class="badge" th:classappend="${esAutorizadoEpis} ? 'bg-success' : 'bg-dark'" th:text="${esAutorizadoEpis} ? 'PC Asignada Habilitada' : 'Solo Consulta'"></span>
                         </div>
                         <div class="card-body p-2">
                             <div th:each="t : ${bandejaEpis}" class="border rounded p-2 mb-2 bg-light">
                                 <div class="fw-bold text-info-emphasis" th:text="${t.efjavCodigoSeguimiento} + ' - ' + ${t.efjavTipoTramite}"></div>
                                 <div class="small text-muted" th:text="${t.efjavAsunto}"></div>
-                                <div class="mt-2" th:if="${equipo == 'PC-EPI-01'}">
+                                <div class="mt-2" th:if="${esAutorizadoEpis}">
                                     <form action="/tramites/atender-epis" method="post" class="mt-1">
                                         <input type="hidden" name="tramiteId" th:value="${t.efjavId}">
                                         <input type="text" name="observacion" class="form-control form-control-sm mb-1" placeholder="Informe técnico...">
@@ -403,13 +405,13 @@
                     <div class="card shadow-sm border-0 h-100">
                         <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
                             <span><i class="bi bi-cash-coin me-1"></i> Unidad Cobranzas</span>
-                            <span class="badge" th:classappend="${equipo == 'PC-COB-01'} ? 'bg-success' : 'bg-dark'" th:text="${equipo == 'PC-COB-01'} ? 'PC Habilitada' : 'Solo Consulta'"></span>
+                            <span class="badge" th:classappend="${esAutorizadoCobranzas} ? 'bg-success' : 'bg-dark'" th:text="${esAutorizadoCobranzas} ? 'PC Asignada Habilitada' : 'Solo Consulta'"></span>
                         </div>
                         <div class="card-body p-2">
                             <div th:each="t : ${bandejaCobranzas}" class="border rounded p-2 mb-2 bg-light">
                                 <div class="fw-bold" th:text="${t.efjavCodigoSeguimiento} + ' - ' + ${t.efjavTipoTramite}"></div>
                                 <div class="small text-muted" th:text="${t.efjavAsunto}"></div>
-                                <div class="mt-2" th:if="${equipo == 'PC-COB-01'}">
+                                <div class="mt-2" th:if="${esAutorizadoCobranzas}">
                                     <form action="/tramites/atender-cobranzas" method="post" class="mt-1">
                                         <input type="hidden" name="tramiteId" th:value="${t.efjavId}">
                                         <input type="text" name="observacion" class="form-control form-control-sm mb-1" placeholder="Detalle estado pagos...">
@@ -428,7 +430,59 @@
             </div>
         </div>
 
-        <!-- 5. CULMINADOS (RN16 & Prueba 18) -->
+        <!-- 5. ENROLAMIENTO REAL DE EQUIPOS (RN06 & RN07) -->
+        <div class="tab-pane fade" id="content-enrolamiento" role="tabpanel">
+            <div class="row justify-content-center">
+                <div class="col-lg-7">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-white fw-bold"><i class="bi bi-shield-lock-fill text-primary me-2"></i>Gestión Real de Equipos Físicos Autorizados</div>
+                        <div class="card-body">
+                            <p class="text-muted small">
+                                La normativa institucional (RN06, RN07) exige que las operaciones de atención de Biblioteca, Decanato, EPIS y Cobranzas se realicen <strong>exclusivamente desde la computadora institucional asignada</strong>.
+                            </p>
+
+                            <div class="p-3 bg-light rounded border mb-4">
+                                <h6 class="fw-bold mb-1">Identificador de este Dispositivo Físico:</h6>
+                                <code class="fs-6 d-block mb-2" th:text="${deviceToken}"></code>
+                                <div>
+                                    <strong>Estado Actual: </strong>
+                                    <span th:if="${equipoEnrolado != null}" class="badge bg-success" th:text="'AUTORIZADO PARA ' + ${equipoEnrolado.efjavOficina} + ' (' + ${equipoEnrolado.efjavNombreEquipo} + ')'"></span>
+                                    <span th:if="${equipoEnrolado == null}" class="badge bg-secondary">EQUIPO NO ENROLADO (PC EXTERNA / ALUMNO)</span>
+                                </div>
+                            </div>
+
+                            <h6 class="fw-bold mb-3">Enrolar esta Computadora Físicamente:</h6>
+                            <form action="/dispositivos/enrolar" method="post" class="mb-4">
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold">Nombre del Equipo Físico:</label>
+                                    <input type="text" name="nombreEquipo" class="form-control" value="Equipo Principal - Emanuel" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold">Oficina Asignada:</label>
+                                    <select name="oficina" class="form-select" required>
+                                        <option value="BIBLIOTECA">Biblioteca Central (Habilita Atención de Préstamos y Devoluciones)</option>
+                                        <option value="FACULTAD">Decanato de Facultad (Habilita Atención, Derivación y Aprobación)</option>
+                                        <option value="EPIS">Dirección de EPIS (Habilita Atención y Observaciones)</option>
+                                        <option value="COBRANZAS">Unidad de Cobranzas (Habilita Aprobación/Rechazo de Pensiones)</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100 fw-semibold">
+                                    <i class="bi bi-link-45deg me-1"></i> Enrolar y Autorizar Esta Computadora
+                                </button>
+                            </form>
+
+                            <form action="/dispositivos/revocar" method="post" th:if="${equipoEnrolado != null}">
+                                <button type="submit" class="btn btn-outline-danger w-100 btn-sm">
+                                    <i class="bi bi-x-circle me-1"></i> Revocar Autorización (Convertir en PC Externa no autorizada)
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. CULMINADOS (RN16 & Prueba 18) -->
         <div class="tab-pane fade" id="content-culminados" role="tabpanel">
             <div class="card shadow-sm border-0 mb-3">
                 <div class="card-body bg-light rounded">

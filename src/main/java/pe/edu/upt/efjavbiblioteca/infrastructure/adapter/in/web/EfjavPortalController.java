@@ -1,5 +1,6 @@
 package pe.edu.upt.efjavbiblioteca.infrastructure.adapter.in.web;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.core.io.FileSystemResource;
@@ -18,6 +19,7 @@ import pe.edu.upt.efjavbiblioteca.application.usecase.EfjavTramiteService;
 import pe.edu.upt.efjavbiblioteca.infrastructure.adapter.out.persistence.entity.*;
 import pe.edu.upt.efjavbiblioteca.infrastructure.adapter.out.persistence.repository.EfjavNotificacionJpaRepository;
 import pe.edu.upt.efjavbiblioteca.infrastructure.config.EfjavTimeService;
+import pe.edu.upt.efjavbiblioteca.infrastructure.security.EfjavDispositivoSecurityService;
 
 import java.io.File;
 import java.io.IOException;
@@ -35,17 +37,20 @@ public class EfjavPortalController {
     private final EfjavRecordatorioService efjavRecordatorioService;
     private final EfjavNotificacionJpaRepository efjavNotificacionJpaRepository;
     private final EfjavTimeService efjavTimeService;
+    private final EfjavDispositivoSecurityService efjavDispositivoSecurityService;
 
     public EfjavPortalController(EfjavBibliotecaService efjavBibliotecaService,
                                  EfjavTramiteService efjavTramiteService,
                                  EfjavRecordatorioService efjavRecordatorioService,
                                  EfjavNotificacionJpaRepository efjavNotificacionJpaRepository,
-                                 EfjavTimeService efjavTimeService) {
+                                 EfjavTimeService efjavTimeService,
+                                 EfjavDispositivoSecurityService efjavDispositivoSecurityService) {
         this.efjavBibliotecaService = efjavBibliotecaService;
         this.efjavTramiteService = efjavTramiteService;
         this.efjavRecordatorioService = efjavRecordatorioService;
         this.efjavNotificacionJpaRepository = efjavNotificacionJpaRepository;
         this.efjavTimeService = efjavTimeService;
+        this.efjavDispositivoSecurityService = efjavDispositivoSecurityService;
     }
 
     private boolean validarSesion(HttpSession session) {
@@ -62,17 +67,28 @@ public class EfjavPortalController {
     public String portal(@RequestParam(value = "fechaInicioFiltro", required = false) String fechaInicioFiltro,
                          @RequestParam(value = "fechaFinFiltro", required = false) String fechaFinFiltro,
                          @RequestParam(value = "criterioFiltro", required = false) String criterioFiltro,
+                         HttpServletRequest request,
+                         HttpServletResponse response,
                          HttpSession session, Model model) {
         if (!validarSesion(session)) return "redirect:/login";
 
         Long userId = (Long) session.getAttribute("AUTH_USER_ID");
         String userCodigo = (String) session.getAttribute("AUTH_USER_CODIGO");
         String userNombre = (String) session.getAttribute("AUTH_USER_NOMBRE");
-        String equipo = (String) session.getAttribute("AUTH_EQUIPO_ID");
+        
+        // Obtener el token real de la máquina física
+        String deviceToken = efjavDispositivoSecurityService.efjavMtdObtenerOGenerarTokenEquipo(request, response);
+        session.setAttribute("AUTH_EQUIPO_ID", deviceToken);
+        Optional<EfjavEquipoAutorizadoEntity> equipoEnroladoOpt = efjavDispositivoSecurityService.efjavMtdBuscarEquipo(deviceToken);
 
         model.addAttribute("userCodigo", userCodigo);
         model.addAttribute("userNombre", userNombre);
-        model.addAttribute("equipo", equipo);
+        model.addAttribute("deviceToken", deviceToken);
+        model.addAttribute("equipoEnrolado", equipoEnroladoOpt.orElse(null));
+        model.addAttribute("esAutorizadoBiblioteca", efjavDispositivoSecurityService.efjavFncEsEquipoAutorizadoParaOficina(deviceToken, "BIBLIOTECA"));
+        model.addAttribute("esAutorizadoFacultad", efjavDispositivoSecurityService.efjavFncEsEquipoAutorizadoParaOficina(deviceToken, "FACULTAD"));
+        model.addAttribute("esAutorizadoEpis", efjavDispositivoSecurityService.efjavFncEsEquipoAutorizadoParaOficina(deviceToken, "EPIS"));
+        model.addAttribute("esAutorizadoCobranzas", efjavDispositivoSecurityService.efjavFncEsEquipoAutorizadoParaOficina(deviceToken, "COBRANZAS"));
         model.addAttribute("fechaServidor", efjavTimeService.efjavFncObtenerFechaHoraServidor());
 
         // Verificaciones de penalidad y notificaciones
@@ -146,10 +162,32 @@ public class EfjavPortalController {
                 .body(resource);
     }
 
-    // Cambiar dinámicamente equipo simulado (para sustentación ágil)
-    @PostMapping("/simular-equipo")
-    public String simularEquipo(@RequestParam("nuevoEquipo") String nuevoEquipo, HttpSession session) {
-        session.setAttribute("AUTH_EQUIPO_ID", nuevoEquipo);
+    // Enrolamiento o desvinculación real del equipo físico actual
+    @PostMapping("/dispositivos/enrolar")
+    public String enrolarEquipoActual(@RequestParam("oficina") String oficina,
+                                      @RequestParam("nombreEquipo") String nombreEquipo,
+                                      HttpServletRequest request,
+                                      HttpServletResponse response,
+                                      HttpSession session,
+                                      RedirectAttributes redirectAttributes) {
+        if (!validarSesion(session)) return "redirect:/login";
+        Long userId = (Long) session.getAttribute("AUTH_USER_ID");
+        String deviceToken = efjavDispositivoSecurityService.efjavMtdObtenerOGenerarTokenEquipo(request, response);
+
+        efjavDispositivoSecurityService.efjavMtdEnrolarEquipo(deviceToken, nombreEquipo, oficina, userId, request.getRemoteAddr());
+        redirectAttributes.addFlashAttribute("successMsg", "Equipo físico enrolado y autorizado satisfactoriamente para la oficina: " + oficina);
+        return "redirect:/portal";
+    }
+
+    @PostMapping("/dispositivos/revocar")
+    public String revocarEquipoActual(HttpServletRequest request,
+                                     HttpServletResponse response,
+                                     HttpSession session,
+                                     RedirectAttributes redirectAttributes) {
+        if (!validarSesion(session)) return "redirect:/login";
+        String deviceToken = efjavDispositivoSecurityService.efjavMtdObtenerOGenerarTokenEquipo(request, response);
+        efjavDispositivoSecurityService.efjavMtdRevocarEquipo(deviceToken);
+        redirectAttributes.addFlashAttribute("successMsg", "Autorización revocada. Esta computadora ahora figura como PC No Autorizada (Externa).");
         return "redirect:/portal";
     }
 
