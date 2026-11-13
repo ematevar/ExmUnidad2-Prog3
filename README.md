@@ -1,8 +1,14 @@
 # Sistema Integral de Gestión de Biblioteca y Trámites Académicos
 **Universidad Privada de Tacna - Escuela Profesional de Ingeniería de Sistemas**  
-**Asignatura:** Programación III | Examen de Unidad  
-**Estudiante:** Emanuel Felipe José Atencio Vargas (`efjav`)  
+**Asignatura:** Programación III | Examen Práctico Integrador de Unidad II  
+**Estudiante:** Emanuel Felipe José Atencio Vargas (`efjav` - Cód. 2024079964)  
 **Tecnologías:** Java 21, Spring Boot, Spring Security, Spring Data JPA, Thymeleaf, MySQL, NetBeans  
+
+---
+
+## Documentación Oficial del Examen
+- **Informe Técnico Completo en PDF:** [Informe_Examen_Unidad_II_EFJAV.pdf](docs/Informe_Examen_Unidad_II_EFJAV.pdf) (Compilado con carátula oficial UPT, Anexo C y diagramas PlantUML).
+- **Declaración Obligatoria de Elementos (Anexo C):** [ANEXO_C_DECLARACION_ELEMENTOS.md](ANEXO_C_DECLARACION_ELEMENTOS.md)
 
 ---
 
