@@ -1,0 +1,263 @@
+package pe.edu.upt.efjavbiblioteca.infrastructure.adapter.in.web;
+
+import jakarta.servlet.http.HttpSession;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import pe.edu.upt.efjavbiblioteca.application.usecase.EfjavBibliotecaService;
+import pe.edu.upt.efjavbiblioteca.application.usecase.EfjavTramiteService;
+import pe.edu.upt.efjavbiblioteca.infrastructure.adapter.out.persistence.entity.*;
+import pe.edu.upt.efjavbiblioteca.infrastructure.adapter.out.persistence.repository.EfjavNotificacionJpaRepository;
+import pe.edu.upt.efjavbiblioteca.infrastructure.config.EfjavTimeService;
+
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+@Controller
+public class EfjavPortalController {
+
+    private final EfjavBibliotecaService efjavBibliotecaService;
+    private final EfjavTramiteService efjavTramiteService;
+    private final EfjavNotificacionJpaRepository efjavNotificacionJpaRepository;
+    private final EfjavTimeService efjavTimeService;
+
+    public EfjavPortalController(EfjavBibliotecaService efjavBibliotecaService,
+                                 EfjavTramiteService efjavTramiteService,
+                                 EfjavNotificacionJpaRepository efjavNotificacionJpaRepository,
+                                 EfjavTimeService efjavTimeService) {
+        this.efjavBibliotecaService = efjavBibliotecaService;
+        this.efjavTramiteService = efjavTramiteService;
+        this.efjavNotificacionJpaRepository = efjavNotificacionJpaRepository;
+        this.efjavTimeService = efjavTimeService;
+    }
+
+    private boolean validarSesion(HttpSession session) {
+        return session.getAttribute("AUTH_USER_ID") != null;
+    }
+
+    @GetMapping("/")
+    public String index(HttpSession session) {
+        if (!validarSesion(session)) return "redirect:/login";
+        return "redirect:/portal";
+    }
+
+    @GetMapping("/portal")
+    public String portal(HttpSession session, Model model) {
+        if (!validarSesion(session)) return "redirect:/login";
+
+        Long userId = (Long) session.getAttribute("AUTH_USER_ID");
+        String userCodigo = (String) session.getAttribute("AUTH_USER_CODIGO");
+        String userNombre = (String) session.getAttribute("AUTH_USER_NOMBRE");
+        String equipo = (String) session.getAttribute("AUTH_EQUIPO_ID");
+
+        model.addAttribute("userCodigo", userCodigo);
+        model.addAttribute("userNombre", userNombre);
+        model.addAttribute("equipo", equipo);
+        model.addAttribute("fechaServidor", efjavTimeService.efjavFncObtenerFechaHoraServidor());
+
+        // Verificaciones de penalidad y notificaciones
+        Optional<EfjavPenalidadEntity> penalidad = efjavBibliotecaService.efjavFncVerificarPenalidadVigente(userId);
+        model.addAttribute("penalidadVigente", penalidad.orElse(null));
+
+        List<EfjavNotificacionEntity> notificaciones = efjavNotificacionJpaRepository.findByEfjavDestinatarioIdOrderByEfjavFechaCreacionDesc(userId);
+        model.addAttribute("notificaciones", notificaciones);
+        model.addAttribute("noLeidasCount", efjavNotificacionJpaRepository.countByEfjavDestinatarioIdAndEfjavLeidaFalse(userId));
+
+        // Catálogo y préstamos
+        model.addAttribute("libros", efjavBibliotecaService.efjavMtdListarLibros());
+        model.addAttribute("misPrestamos", efjavBibliotecaService.efjavMtdListarPrestamosEstudiante(userId));
+        model.addAttribute("todosPrestamos", efjavBibliotecaService.efjavMtdListarTodosLosPrestamos());
+
+        // Trámites
+        model.addAttribute("misTramites", efjavTramiteService.efjavMtdListarPorEstudiante(userId));
+        
+        // Bandejas según oficina/instancia
+        model.addAttribute("bandejaFacultad", efjavTramiteService.efjavMtdListarPorUbicacion(1L));
+        model.addAttribute("bandejaEpis", efjavTramiteService.efjavMtdListarPorUbicacion(2L));
+        model.addAttribute("bandejaCobranzas", efjavTramiteService.efjavMtdListarPorUbicacion(3L));
+
+        // Culminados (últimos 30 días)
+        LocalDateTime inicio = LocalDateTime.now().minusDays(30);
+        LocalDateTime fin = LocalDateTime.now().plusDays(1);
+        model.addAttribute("culminados", efjavTramiteService.efjavMtdListarCulminados(inicio, fin));
+
+        return "portal";
+    }
+
+    // Cambiar dinámicamente equipo simulado (para sustentación ágil)
+    @PostMapping("/simular-equipo")
+    public String simularEquipo(@RequestParam("nuevoEquipo") String nuevoEquipo, HttpSession session) {
+        session.setAttribute("AUTH_EQUIPO_ID", nuevoEquipo);
+        return "redirect:/portal";
+    }
+
+    // Solicitar préstamo
+    @PostMapping("/biblioteca/solicitar")
+    public String solicitarPrestamo(@RequestParam("libroId") Long libroId,
+                                    HttpSession session,
+                                    RedirectAttributes redirectAttributes) {
+        if (!validarSesion(session)) return "redirect:/login";
+        Long userId = (Long) session.getAttribute("AUTH_USER_ID");
+        String userCodigo = (String) session.getAttribute("AUTH_USER_CODIGO");
+        String equipo = (String) session.getAttribute("AUTH_EQUIPO_ID");
+
+        try {
+            efjavBibliotecaService.efjavMtdSolicitarPrestamo(userId, userCodigo, libroId, "127.0.0.1", equipo);
+            redirectAttributes.addFlashAttribute("successMsg", "Solicitud de préstamo registrada exitosamente dentro del horario.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/portal";
+    }
+
+    // Confirmar préstamo con 2 firmas (Biblioteca)
+    @PostMapping("/biblioteca/confirmar")
+    public String confirmarPrestamo(@RequestParam("prestamoId") Long prestamoId,
+                                    @RequestParam("firmaEstudiante") String firmaEstudiante,
+                                    @RequestParam("firmaBibliotecario") String firmaBibliotecario,
+                                    HttpSession session,
+                                    RedirectAttributes redirectAttributes) {
+        if (!validarSesion(session)) return "redirect:/login";
+        Long userId = (Long) session.getAttribute("AUTH_USER_ID");
+        String userCodigo = (String) session.getAttribute("AUTH_USER_CODIGO");
+        String equipo = (String) session.getAttribute("AUTH_EQUIPO_ID");
+
+        try {
+            efjavBibliotecaService.efjavMtdConfirmarPrestamoConDosFirmas(prestamoId, userId, userCodigo, firmaEstudiante, firmaBibliotecario, "127.0.0.1", equipo);
+            redirectAttributes.addFlashAttribute("successMsg", "Préstamo confirmado y entregado con ambas firmas registradas.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/portal";
+    }
+
+    // Registrar devolución con 2 firmas y cálculo de penalidad
+    @PostMapping("/biblioteca/devolver")
+    public String registrarDevolucion(@RequestParam("prestamoId") Long prestamoId,
+                                      @RequestParam("firmaEstudiante") String firmaEstudiante,
+                                      @RequestParam("firmaBibliotecario") String firmaBibliotecario,
+                                      @RequestParam("estadoFisico") String estadoFisico,
+                                      @RequestParam(value = "observacion", required = false) String observacion,
+                                      @RequestParam(value = "diasRetrasoManual", required = false) Integer diasRetrasoManual,
+                                      HttpSession session,
+                                      RedirectAttributes redirectAttributes) {
+        if (!validarSesion(session)) return "redirect:/login";
+        Long userId = (Long) session.getAttribute("AUTH_USER_ID");
+        String userCodigo = (String) session.getAttribute("AUTH_USER_CODIGO");
+        String equipo = (String) session.getAttribute("AUTH_EQUIPO_ID");
+
+        try {
+            efjavBibliotecaService.efjavMtdRegistrarDevolucion(prestamoId, userId, userCodigo, firmaEstudiante, firmaBibliotecario,
+                    estadoFisico, observacion, diasRetrasoManual, "127.0.0.1", equipo);
+            redirectAttributes.addFlashAttribute("successMsg", "Devolución registrada correctamente.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/portal";
+    }
+
+    // Registrar nuevo trámite
+    @PostMapping("/tramites/registrar")
+    public String registrarTramite(@RequestParam("tipoTramite") String tipoTramite,
+                                   @RequestParam("asunto") String asunto,
+                                   @RequestParam("instanciaDestinoId") Long instanciaDestinoId,
+                                   @RequestParam("documentoPdf") MultipartFile documentoPdf,
+                                   @RequestParam("firmaEstudiante") String firmaEstudiante,
+                                   HttpSession session,
+                                   RedirectAttributes redirectAttributes) {
+        if (!validarSesion(session)) return "redirect:/login";
+        Long userId = (Long) session.getAttribute("AUTH_USER_ID");
+        String userCodigo = (String) session.getAttribute("AUTH_USER_CODIGO");
+        String equipo = (String) session.getAttribute("AUTH_EQUIPO_ID");
+
+        try {
+            EfjavTramiteEntity tramite = efjavTramiteService.efjavMtdRegistrarTramite(
+                    userId, userCodigo, tipoTramite, asunto, instanciaDestinoId, documentoPdf, firmaEstudiante, "127.0.0.1", equipo
+            );
+            redirectAttributes.addFlashAttribute("successMsg", "Trámite enviado exitosamente. Código de seguimiento: " + tramite.getEfjavCodigoSeguimiento());
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/portal";
+    }
+
+    // Atender trámite en Facultad
+    @PostMapping("/tramites/atender-facultad")
+    public String atenderFacultad(@RequestParam("tramiteId") Long tramiteId,
+                                  @RequestParam("accion") String accion,
+                                  @RequestParam(value = "observacion", required = false) String observacion,
+                                  @RequestParam("firmaDecano") String firmaDecano,
+                                  HttpSession session,
+                                  RedirectAttributes redirectAttributes) {
+        if (!validarSesion(session)) return "redirect:/login";
+        Long userId = (Long) session.getAttribute("AUTH_USER_ID");
+        String userCodigo = (String) session.getAttribute("AUTH_USER_CODIGO");
+        String equipo = (String) session.getAttribute("AUTH_EQUIPO_ID");
+
+        try {
+            efjavTramiteService.efjavMtdAtenderEnFacultad(tramiteId, userId, userCodigo, accion, observacion, firmaDecano, "127.0.0.1", equipo);
+            redirectAttributes.addFlashAttribute("successMsg", "Expediente procesado en Facultad exitosamente.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/portal";
+    }
+
+    // Atender trámite en EPIS
+    @PostMapping("/tramites/atender-epis")
+    public String atenderEpis(@RequestParam("tramiteId") Long tramiteId,
+                              @RequestParam("accion") String accion,
+                              @RequestParam(value = "observacion", required = false) String observacion,
+                              @RequestParam("firmaDirector") String firmaDirector,
+                              HttpSession session,
+                              RedirectAttributes redirectAttributes) {
+        if (!validarSesion(session)) return "redirect:/login";
+        Long userId = (Long) session.getAttribute("AUTH_USER_ID");
+        String userCodigo = (String) session.getAttribute("AUTH_USER_CODIGO");
+        String equipo = (String) session.getAttribute("AUTH_EQUIPO_ID");
+
+        try {
+            efjavTramiteService.efjavMtdAtenderEnEpis(tramiteId, userId, userCodigo, accion, observacion, firmaDirector, "127.0.0.1", equipo);
+            redirectAttributes.addFlashAttribute("successMsg", "Expediente procesado en EPIS exitosamente.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/portal";
+    }
+
+    // Atender trámite en Cobranzas
+    @PostMapping("/tramites/atender-cobranzas")
+    public String atenderCobranzas(@RequestParam("tramiteId") Long tramiteId,
+                                   @RequestParam("accion") String accion,
+                                   @RequestParam(value = "observacion", required = false) String observacion,
+                                   @RequestParam("firmaResponsable") String firmaResponsable,
+                                   HttpSession session,
+                                   RedirectAttributes redirectAttributes) {
+        if (!validarSesion(session)) return "redirect:/login";
+        Long userId = (Long) session.getAttribute("AUTH_USER_ID");
+        String userCodigo = (String) session.getAttribute("AUTH_USER_CODIGO");
+        String equipo = (String) session.getAttribute("AUTH_EQUIPO_ID");
+
+        try {
+            efjavTramiteService.efjavMtdAtenderEnCobranzas(tramiteId, userId, userCodigo, accion, observacion, firmaResponsable, "127.0.0.1", equipo);
+            redirectAttributes.addFlashAttribute("successMsg", "Expediente atendido en Cobranzas exitosamente.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/portal";
+    }
+
+    // Marcar notificación leída
+    @GetMapping("/notificaciones/marcar-leida/{id}")
+    public String marcarNotificacionLeida(@PathVariable("id") Long id) {
+        efjavNotificacionJpaRepository.findById(id).ifPresent(n -> {
+            n.setEfjavLeida(true);
+            efjavNotificacionJpaRepository.save(n);
+        });
+        return "redirect:/portal";
+    }
+}

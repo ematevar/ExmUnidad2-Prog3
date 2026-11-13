@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>UPT - Portal de Gestión Integral</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        body {
+            background-color: #f4f6f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar-upt {
+            background: linear-gradient(90deg, #0d47a1 0%, #1976d2 100%);
+        }
+        .signature-box {
+            border: 2px dashed #bbb;
+            background-color: #fff;
+            border-radius: 6px;
+            cursor: crosshair;
+        }
+        .nav-pills .nav-link.active {
+            background-color: #0d47a1;
+        }
+        .badge-status {
+            font-size: 0.85rem;
+            padding: 0.35em 0.6em;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Barra de Navegación Superior -->
+<nav class="navbar navbar-expand-lg navbar-dark navbar-upt shadow-sm sticky-top">
+    <div class="container-fluid px-4">
+        <a class="navbar-brand fw-bold d-flex align-items-center" href="/portal">
+            <i class="bi bi-mortarboard-fill me-2 fs-4"></i> UPT - Sistema Integral
+        </a>
+        <div class="d-flex align-items-center text-white">
+            <!-- Selector interactivo de Equipo Simulado -->
+            <form action="/simular-equipo" method="post" class="d-flex align-items-center me-3 bg-white text-dark px-2 py-1 rounded shadow-sm">
+                <i class="bi bi-pc-display me-1 text-primary"></i>
+                <span class="small fw-semibold me-2">Equipo:</span>
+                <select name="nuevoEquipo" class="form-select form-select-sm border-0 bg-transparent fw-bold text-primary" onchange="this.form.submit()">
+                    <option value="PC-EXTERNA-01" th:selected="${equipo == 'PC-EXTERNA-01'}">PC-EXTERNA-01 (Alumno / Externa)</option>
+                    <option value="PC-BIB-01" th:selected="${equipo == 'PC-BIB-01'}">PC-BIB-01 (Asignada Biblioteca)</option>
+                    <option value="PC-DEC-01" th:selected="${equipo == 'PC-DEC-01'}">PC-DEC-01 (Asignada Decanato)</option>
+                    <option value="PC-EPI-01" th:selected="${equipo == 'PC-EPI-01'}">PC-EPI-01 (Asignada EPIS)</option>
+                    <option value="PC-COB-01" th:selected="${equipo == 'PC-COB-01'}">PC-COB-01 (Asignada Cobranzas)</option>
+                </select>
+            </form>
+
+            <div class="me-3 text-end d-none d-md-block">
+                <div class="fw-semibold small" th:text="${userNombre}"></div>
+                <div class="text-light" style="font-size: 0.75rem;" th:text="'Código: ' + ${userCodigo} + ' | Servidor: ' + ${#temporals.format(fechaServidor, 'dd/MM/yyyy HH:mm')}"></div>
+            </div>
+            <a href="/logout" class="btn btn-outline-light btn-sm"><i class="bi bi-box-arrow-right"></i> Salir</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid px-4 py-3">
+    <!-- Alertas Flash -->
+    <div th:if="${errorMsg}" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i><span th:text="${errorMsg}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <div th:if="${successMsg}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i><span th:text="${successMsg}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <!-- Alerta de Penalidad Vigente si existe -->
+    <div th:if="${penalidadVigente != null}" class="alert alert-warning border-warning shadow-sm" role="alert">
+        <h6 class="alert-heading fw-bold"><i class="bi bi-shield-slash-fill me-2"></i>ESTUDIANTE SUSPENDIDO EN BIBLIOTECA</h6>
+        <p class="mb-1" th:text="${penalidadVigente.efjavReglaAplicada}"></p>
+        <small class="text-muted" th:text="'Periodo de suspensión: ' + ${penalidadVigente.efjavFechaInicioSuspension} + ' al ' + ${penalidadVigente.efjavFechaFinSuspension} + ' (Días sanción: ' + ${penalidadVigente.efjavDiasSuspension} + ')'"></small>
+    </div>
+
+    <!-- Pestañas Principales -->
+    <ul class="nav nav-pills mb-3 bg-white p-2 rounded shadow-sm" id="pills-tab" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active fw-semibold" id="tab-inicio" data-bs-toggle="pill" data-bs-target="#content-inicio" type="button"><i class="bi bi-speedometer2 me-1"></i> Resumen</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link fw-semibold" id="tab-biblioteca" data-bs-toggle="pill" data-bs-target="#content-biblioteca" type="button"><i class="bi bi-book me-1"></i> Biblioteca</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link fw-semibold" id="tab-tramites" data-bs-toggle="pill" data-bs-target="#content-tramites" type="button"><i class="bi bi-file-earmark-text me-1"></i> Trámites Académicos</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link fw-semibold" id="tab-oficinas" data-bs-toggle="pill" data-bs-target="#content-oficinas" type="button"><i class="bi bi-building-gear me-1"></i> Bandeja Oficinas (Facultad / EPIS / Cobranzas)</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link fw-semibold" id="tab-culminados" data-bs-toggle="pill" data-bs-target="#content-culminados" type="button"><i class="bi bi-archive me-1"></i> Culminados</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link fw-semibold position-relative" id="tab-notif" data-bs-toggle="pill" data-bs-target="#content-notif" type="button">
+                <i class="bi bi-bell me-1"></i> Notificaciones
+                <span th:if="${noLeidasCount > 0}" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" th:text="${noLeidasCount}"></span>
+            </button>
+        </li>
+    </ul>
+
+    <!-- Contenido de Pestañas -->
+    <div class="tab-content" id="pills-tabContent">
+
+        <!-- 1. RESUMEN / INICIO -->
+        <div class="tab-pane fade show active" id="content-inicio" role="tabpanel">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-header bg-white fw-bold"><i class="bi bi-book-half text-primary me-2"></i>Mis Préstamos de Biblioteca</div>
+                        <div class="card-body p-0">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light"><tr><th>Código</th><th>Estado</th><th>F. Solicitud</th><th>F. Vencimiento</th></tr></thead>
+                                <tbody>
+                                    <tr th:each="p : ${misPrestamos}">
+                                        <td class="fw-semibold" th:text="${p.efjavCodigo}"></td>
+                                        <td><span class="badge bg-primary badge-status" th:text="${p.efjavEstado}"></span></td>
+                                        <td th:text="${#temporals.format(p.efjavFechaSolicitud, 'dd/MM/yyyy HH:mm')}"></td>
+                                        <td th:text="${#temporals.format(p.efjavFechaLimiteDevolucion, 'dd/MM/yyyy')}"></td>
+                                    </tr>
+                                    <tr th:if="${#lists.isEmpty(misPrestamos)}"><td colspan="4" class="text-center text-muted py-3">No tienes préstamos registrados.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-header bg-white fw-bold"><i class="bi bi-send text-success me-2"></i>Mis Trámites Académicos Presentados</div>
+                        <div class="card-body p-0">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light"><tr><th>Seguimiento</th><th>Tipo</th><th>Ubicación</th><th>Estado</th></tr></thead>
+                                <tbody>
+                                    <tr th:each="t : ${misTramites}">
+                                        <td class="fw-semibold text-primary" th:text="${t.efjavCodigoSeguimiento}"></td>
+                                        <td th:text="${t.efjavTipoTramite}"></td>
+                                        <td th:text="'Oficina #' + ${t.efjavUbicacionActualId}"></td>
+                                        <td><span class="badge bg-info text-dark badge-status" th:text="${t.efjavEstado}"></span></td>
+                                    </tr>
+                                    <tr th:if="${#lists.isEmpty(misTramites)}"><td colspan="4" class="text-center text-muted py-3">No has presentado trámites aún.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. BIBLIOTECA -->
+        <div class="tab-pane fade" id="content-biblioteca" role="tabpanel">
+            <div class="row g-3">
+                <div class="col-lg-7">
+                    <div class="card shadow-sm border-0 mb-3">
+                        <div class="card-header bg-white fw-bold"><i class="bi bi-journals me-2 text-primary"></i>Catálogo de Libros Disponibles (Horario: 08:00 a 20:00)</div>
+                        <div class="card-body p-0">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light"><tr><th>Código</th><th>Título</th><th>Autor</th><th>Stock</th><th>Acción</th></tr></thead>
+                                <tbody>
+                                    <tr th:each="lib : ${libros}">
+                                        <td class="fw-bold" th:text="${lib.efjavCodigo}"></td>
+                                        <td th:text="${lib.efjavTitulo}"></td>
+                                        <td class="text-muted" th:text="${lib.efjavAutor}"></td>
+                                        <td><span class="badge bg-secondary" th:text="${lib.efjavEjemplaresDisponibles} + ' / ' + ${lib.efjavEjemplaresTotales}"></span></td>
+                                        <td>
+                                            <form action="/biblioteca/solicitar" method="post" class="d-inline">
+                                                <input type="hidden" name="libroId" th:value="${lib.efjavId}">
+                                                <button type="submit" class="btn btn-outline-primary btn-sm" th:disabled="${lib.efjavEjemplaresDisponibles <= 0 || penalidadVigente != null}">
+                                                    <i class="bi bi-cart-plus me-1"></i> Solicitar
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-gear-fill me-2 text-secondary"></i>Atención en Biblioteca (Requiere PC-BIB-01)</span>
+                            <span class="badge" th:classappend="${equipo == 'PC-BIB-01'} ? 'bg-success' : 'bg-danger'" th:text="${equipo == 'PC-BIB-01'} ? 'PC Autorizada' : 'No Autorizada'"></span>
+                        </div>
+                        <div class="card-body">
+                            <h6 class="fw-bold mb-2">1. Despacho / Entrega de Libro (Doble Firma):</h6>
+                            <form action="/biblioteca/confirmar" method="post" onsubmit="prepararFirmasPrestamo()">
+                                <div class="mb-2">
+                                    <label class="form-label small">Préstamo Solicitado:</label>
+                                    <select name="prestamoId" class="form-select form-select-sm" required>
+                                        <option value="">Seleccione solicitud...</option>
+                                        <option th:each="p : ${todosPrestamos}" th:if="${p.efjavEstado == 'SOLICITADO'}" th:value="${p.efjavId}" th:text="${p.efjavCodigo} + ' (Estudiante ID ' + ${p.efjavEstudianteId} + ')'"></option>
+                                    </select>
+                                </div>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6">
+                                        <label class="small text-muted">Firma Alumno:</label>
+                                        <canvas id="canvasFirmaEst" class="signature-box w-100" height="90"></canvas>
+                                        <input type="hidden" name="firmaEstudiante" id="hiddenFirmaEst">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="small text-muted">Firma Bibliotecario:</label>
+                                        <canvas id="canvasFirmaBib" class="signature-box w-100" height="90"></canvas>
+                                        <input type="hidden" name="firmaBibliotecario" id="hiddenFirmaBib">
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-success btn-sm w-100 mb-3" th:disabled="${equipo != 'PC-BIB-01'}">
+                                    <i class="bi bi-check2-circle"></i> Confirmar Préstamo (2 Firmas)
+                                </button>
+                            </form>
+
+                            <hr>
+                            <h6 class="fw-bold mb-2">2. Devolución y Cálculo de Penalidad (2x Días de Retraso):</h6>
+                            <form action="/biblioteca/devolver" method="post" onsubmit="prepararFirmasDevolucion()">
+                                <div class="mb-2">
+                                    <label class="form-label small">Préstamo Activo a Devolver:</label>
+                                    <select name="prestamoId" class="form-select form-select-sm" required>
+                                        <option value="">Seleccione préstamo activo...</option>
+                                        <option th:each="p : ${todosPrestamos}" th:if="${p.efjavEstado == 'ACTIVO'}" th:value="${p.efjavId}" th:text="${p.efjavCodigo} + ' - Vence: ' + ${#temporals.format(p.efjavFechaLimiteDevolucion, 'dd/MM/yyyy')}"></option>
+                                    </select>
+                                </div>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6">
+                                        <label class="form-label small">Estado Físico:</label>
+                                        <select name="estadoFisico" class="form-select form-select-sm">
+                                            <option value="CONFORME">Conforme</option>
+                                            <option value="OBSERVADO">Con Observaciones / Daño</option>
+                                            <option value="EN_REPARACION">En Reparación</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small">Simular Días Demora:</label>
+                                        <input type="number" name="diasRetrasoManual" class="form-control form-select-sm" placeholder="Ej: 3 (Sanción 6)" min="0" value="0">
+                                    </div>
+                                </div>
+                                <div class="mb-2">
+                                    <input type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación o incidencia...">
+                                </div>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6">
+                                        <label class="small text-muted">Firma Entrega:</label>
+                                        <canvas id="canvasFirmaDevEst" class="signature-box w-100" height="80"></canvas>
+                                        <input type="hidden" name="firmaEstudiante" id="hiddenFirmaDevEst">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="small text-muted">Firma Recepción:</label>
+                                        <canvas id="canvasFirmaDevBib" class="signature-box w-100" height="80"></canvas>
+                                        <input type="hidden" name="firmaBibliotecario" id="hiddenFirmaDevBib">
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-warning btn-sm w-100" th:disabled="${equipo != 'PC-BIB-01'}">
+                                    <i class="bi bi-arrow-return-left"></i> Procesar Devolución
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. TRÁMITES ACADÉMICOS (PRESENTACIÓN) -->
+        <div class="tab-pane fade" id="content-tramites" role="tabpanel">
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-white fw-bold"><i class="bi bi-file-earmark-arrow-up me-2 text-primary"></i>Presentación de Solicitud de Trámite (Horario: 08:00 a 17:00)</div>
+                        <div class="card-body">
+                            <form action="/tramites/registrar" method="post" enctype="multipart/form-data" onsubmit="prepararFirmaTramite()">
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Instancia de Destino</label>
+                                    <select name="instanciaDestinoId" class="form-select" required>
+                                        <option value="1">Facultad (Decanato)</option>
+                                        <option value="2">Dirección de EPIS</option>
+                                        <option value="3">Unidad de Cobranzas</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Tipo de Trámite</label>
+                                    <select name="tipoTramite" class="form-select" required>
+                                        <option value="Constancia de Estudios">Constancia de Estudios</option>
+                                        <option value="Reserva de Matrícula">Reserva de Matrícula</option>
+                                        <option value="Carta de Presentación">Carta de Presentación</option>
+                                        <option value="Rectificación de Matrícula">Rectificación de Matrícula</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Asunto o Fundamentación</label>
+                                    <input type="text" name="asunto" class="form-control" placeholder="Ej: Solicitud de constancia de estudios ciclo 2026-II" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Formato Institucional en PDF (Obligatorio .pdf)</label>
+                                    <input type="file" name="documentoPdf" class="form-control" accept="application/pdf" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Firma Manuscrita Digitalizada</label>
+                                    <canvas id="canvasFirmaTramite" class="signature-box w-100" height="120"></canvas>
+                                    <input type="hidden" name="firmaEstudiante" id="hiddenFirmaTramite">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="limpiarCanvas('canvasFirmaTramite')">Limpiar Firma</button>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold">
+                                    <i class="bi bi-send-fill me-1"></i> Enviar Expediente y Obtener Código Único
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-white fw-bold"><i class="bi bi-clock-history me-2 text-secondary"></i>Bandeja de Trámites Presentados</div>
+                        <div class="card-body p-0">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light"><tr><th>Código</th><th>Asunto</th><th>Ubicación</th><th>Estado</th></tr></thead>
+                                <tbody>
+                                    <tr th:each="t : ${misTramites}">
+                                        <td class="fw-bold text-primary" th:text="${t.efjavCodigoSeguimiento}"></td>
+                                        <td th:text="${t.efjavAsunto}"></td>
+                                        <td>
+                                            <span th:if="${t.efjavUbicacionActualId == 1}" class="badge bg-warning text-dark">Facultad</span>
+                                            <span th:if="${t.efjavUbicacionActualId == 2}" class="badge bg-info text-dark">EPIS</span>
+                                            <span th:if="${t.efjavUbicacionActualId == 3}" class="badge bg-secondary">Cobranzas</span>
+                                        </td>
+                                        <td><span class="badge bg-primary" th:text="${t.efjavEstado}"></span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. BANDEJA DE OFICINAS (FACULTAD, EPIS, COBRANZAS) -->
+        <div class="tab-pane fade" id="content-oficinas" role="tabpanel">
+            <div class="row g-3">
+                <!-- Facultad -->
+                <div class="col-md-4">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-bank me-1"></i> Decanato Facultad</span>
+                            <span class="badge" th:classappend="${equipo == 'PC-DEC-01'} ? 'bg-success' : 'bg-dark'" th:text="${equipo == 'PC-DEC-01'} ? 'PC Habilitada' : 'Solo Consulta'"></span>
+                        </div>
+                        <div class="card-body p-2">
+                            <div th:each="t : ${bandejaFacultad}" class="border rounded p-2 mb-2 bg-light">
+                                <div class="fw-bold text-primary" th:text="${t.efjavCodigoSeguimiento} + ' - ' + ${t.efjavTipoTramite}"></div>
+                                <div class="small text-muted" th:text="${t.efjavAsunto}"></div>
+                                <div class="mt-2" th:if="${equipo == 'PC-DEC-01'}">
+                                    <form action="/tramites/atender-facultad" method="post" class="mt-1" onsubmit="prepararFirmaDecano(this)">
+                                        <input type="hidden" name="tramiteId" th:value="${t.efjavId}">
+                                        <input type="text" name="observacion" class="form-control form-control-sm mb-1" placeholder="Observación / Proveído">
+                                        <input type="hidden" name="firmaDecano" value="FIRMA_DIGITALIZADA_DECANATO_BASE64">
+                                        <div class="btn-group btn-group-sm w-100">
+                                            <button type="submit" name="accion" value="APROBAR" class="btn btn-success"><i class="bi bi-check-lg"></i> Aprobar</button>
+                                            <button type="submit" name="accion" value="DERIVAR_EPIS" class="btn btn-warning"><i class="bi bi-arrow-right"></i> Derivar EPIS</button>
+                                            <button type="submit" name="accion" value="RECHAZAR" class="btn btn-danger"><i class="bi bi-x-lg"></i> Rechazar</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            <div th:if="${#lists.isEmpty(bandejaFacultad)}" class="text-center text-muted py-4 small">Sin expedientes pendientes.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EPIS -->
+                <div class="col-md-4">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-header bg-info text-dark d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-laptop me-1"></i> Dirección EPIS</span>
+                            <span class="badge" th:classappend="${equipo == 'PC-EPI-01'} ? 'bg-success' : 'bg-dark'" th:text="${equipo == 'PC-EPI-01'} ? 'PC Habilitada' : 'Solo Consulta'"></span>
+                        </div>
+                        <div class="card-body p-2">
+                            <div th:each="t : ${bandejaEpis}" class="border rounded p-2 mb-2 bg-light">
+                                <div class="fw-bold text-info-emphasis" th:text="${t.efjavCodigoSeguimiento} + ' - ' + ${t.efjavTipoTramite}"></div>
+                                <div class="small text-muted" th:text="${t.efjavAsunto}"></div>
+                                <div class="mt-2" th:if="${equipo == 'PC-EPI-01'}">
+                                    <form action="/tramites/atender-epis" method="post" class="mt-1">
+                                        <input type="hidden" name="tramiteId" th:value="${t.efjavId}">
+                                        <input type="text" name="observacion" class="form-control form-control-sm mb-1" placeholder="Informe técnico...">
+                                        <input type="hidden" name="firmaDirector" value="FIRMA_DIGITALIZADA_EPIS_BASE64">
+                                        <div class="btn-group btn-group-sm w-100">
+                                            <button type="submit" name="accion" value="DEVOLVER_FACULTAD" class="btn btn-primary"><i class="bi bi-reply-fill"></i> Responder a Facultad</button>
+                                            <button type="submit" name="accion" value="OBSERVAR" class="btn btn-warning"><i class="bi bi-exclamation-circle"></i> Observar</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            <div th:if="${#lists.isEmpty(bandejaEpis)}" class="text-center text-muted py-4 small">Sin expedientes en EPIS.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cobranzas -->
+                <div class="col-md-4">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-cash-coin me-1"></i> Unidad Cobranzas</span>
+                            <span class="badge" th:classappend="${equipo == 'PC-COB-01'} ? 'bg-success' : 'bg-dark'" th:text="${equipo == 'PC-COB-01'} ? 'PC Habilitada' : 'Solo Consulta'"></span>
+                        </div>
+                        <div class="card-body p-2">
+                            <div th:each="t : ${bandejaCobranzas}" class="border rounded p-2 mb-2 bg-light">
+                                <div class="fw-bold" th:text="${t.efjavCodigoSeguimiento} + ' - ' + ${t.efjavTipoTramite}"></div>
+                                <div class="small text-muted" th:text="${t.efjavAsunto}"></div>
+                                <div class="mt-2" th:if="${equipo == 'PC-COB-01'}">
+                                    <form action="/tramites/atender-cobranzas" method="post" class="mt-1">
+                                        <input type="hidden" name="tramiteId" th:value="${t.efjavId}">
+                                        <input type="text" name="observacion" class="form-control form-control-sm mb-1" placeholder="Detalle estado pagos...">
+                                        <input type="hidden" name="firmaResponsable" value="FIRMA_DIGITALIZADA_COBRANZAS_BASE64">
+                                        <div class="btn-group btn-group-sm w-100">
+                                            <button type="submit" name="accion" value="APROBAR" class="btn btn-success"><i class="bi bi-check-circle"></i> Aprobar</button>
+                                            <button type="submit" name="accion" value="RECHAZAR" class="btn btn-danger"><i class="bi bi-x-circle"></i> Denegar</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            <div th:if="${#lists.isEmpty(bandejaCobranzas)}" class="text-center text-muted py-4 small">Sin expedientes en Cobranzas.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. CULMINADOS (RN16) -->
+        <div class="tab-pane fade" id="content-culminados" role="tabpanel">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-archive-fill text-success me-2"></i>Expedientes Culminados y Archivados</span>
+                    <span class="badge bg-success" th:text="${#lists.size(culminados)} + ' Finalizados'"></span>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light"><tr><th>Código</th><th>Tipo Trámite</th><th>Asunto</th><th>F. Envío</th><th>F. Conclusión</th><th>Estado Final</th></tr></thead>
+                        <tbody>
+                            <tr th:each="c : ${culminados}">
+                                <td class="fw-bold text-primary" th:text="${c.efjavCodigoSeguimiento}"></td>
+                                <td th:text="${c.efjavTipoTramite}"></td>
+                                <td th:text="${c.efjavAsunto}"></td>
+                                <td th:text="${#temporals.format(c.efjavFechaEnvio, 'dd/MM/yyyy HH:mm')}"></td>
+                                <td th:text="${#temporals.format(c.efjavFechaConclusion, 'dd/MM/yyyy HH:mm')}"></td>
+                                <td><span class="badge bg-success" th:text="${c.efjavEstado}"></span></td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(culminados)}"><td colspan="6" class="text-center text-muted py-4">No hay trámites culminados aún.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. NOTIFICACIONES -->
+        <div class="tab-pane fade" id="content-notif" role="tabpanel">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white fw-bold"><i class="bi bi-bell-fill text-warning me-2"></i>Bandeja de Notificaciones Internas</div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        <div th:each="n : ${notificaciones}" class="list-group-item d-flex justify-content-between align-items-start" th:classappend="${!n.efjavLeida} ? 'bg-light' : ''">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold" th:text="${n.efjavTitulo}"></div>
+                                <span th:text="${n.efjavContenido}"></span>
+                                <div class="text-muted small mt-1" th:text="${#temporals.format(n.efjavFechaCreacion, 'dd/MM/yyyy HH:mm')}"></div>
+                            </div>
+                            <div>
+                                <span th:if="${n.efjavLeida}" class="badge bg-secondary me-2">Leída</span>
+                                <a th:if="${!n.efjavLeida}" th:href="'/notificaciones/marcar-leida/' + ${n.efjavId}" class="btn btn-outline-primary btn-sm">Marcar Leída</a>
+                            </div>
+                        </div>
+                        <div th:if="${#lists.isEmpty(notificaciones)}" class="p-4 text-center text-muted">No tienes notificaciones pendientes.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function inicializarCanvas(id) {
+        const canvas = document.getElementById(id);
+        if (!canvas) return null;
+        const ctx = canvas.getContext('2d');
+        let painting = false;
+
+        function startPosition(e) { painting = true; draw(e); }
+        function endPosition() { painting = false; ctx.beginPath(); }
+        function draw(e) {
+            if (!painting) return;
+            const rect = canvas.getBoundingClientRect();
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#000';
+            ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+        }
+
+        canvas.addEventListener('mousedown', startPosition);
+        canvas.addEventListener('mouseup', endPosition);
+        canvas.addEventListener('mousemove', draw);
+        return canvas;
+    }
+
+    function limpiarCanvas(id) {
+        const c = document.getElementById(id);
+        if (c) {
+            const ctx = c.getContext('2d');
+            ctx.clearRect(0, 0, c.width, c.height);
+        }
+    }
+
+    window.addEventListener('load', () => {
+        inicializarCanvas('canvasFirmaEst');
+        inicializarCanvas('canvasFirmaBib');
+        inicializarCanvas('canvasFirmaDevEst');
+        inicializarCanvas('canvasFirmaDevBib');
+        inicializarCanvas('canvasFirmaTramite');
+    });
+
+    function prepararFirmasPrestamo() {
+        const c1 = document.getElementById('canvasFirmaEst');
+        const c2 = document.getElementById('canvasFirmaBib');
+        document.getElementById('hiddenFirmaEst').value = c1 ? c1.toDataURL() : 'FIRMA_BASE64_SIMULADA_EST';
+        document.getElementById('hiddenFirmaBib').value = c2 ? c2.toDataURL() : 'FIRMA_BASE64_SIMULADA_BIB';
+    }
+
+    function prepararFirmasDevolucion() {
+        const c1 = document.getElementById('canvasFirmaDevEst');
+        const c2 = document.getElementById('canvasFirmaDevBib');
+        document.getElementById('hiddenFirmaDevEst').value = c1 ? c1.toDataURL() : 'FIRMA_DEV_EST';
+        document.getElementById('hiddenFirmaDevBib').value = c2 ? c2.toDataURL() : 'FIRMA_DEV_BIB';
+    }
+
+    function prepararFirmaTramite() {
+        const c = document.getElementById('canvasFirmaTramite');
+        document.getElementById('hiddenFirmaTramite').value = c ? c.toDataURL() : 'FIRMA_TRAMITE_EST';
+    }
+</script>
+</body>
+</html>
