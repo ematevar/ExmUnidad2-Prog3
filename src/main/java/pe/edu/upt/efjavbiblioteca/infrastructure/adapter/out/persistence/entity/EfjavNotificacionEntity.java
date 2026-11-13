@@ -38,6 +38,7 @@ public class EfjavNotificacionEntity {
     public EfjavNotificacionEntity() {
         this.efjavFechaCreacion = LocalDateTime.now();
         this.efjavLeida = false;
+        this.efjavCanal = "SISTEMA";
         this.efjavEstadoEnvio = "ENVIADO";
     }
 

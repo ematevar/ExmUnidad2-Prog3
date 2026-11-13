@@ -221,6 +221,7 @@ public class EfjavBibliotecaService {
             // Crear notificación automática para el estudiante
             EfjavNotificacionEntity notif = new EfjavNotificacionEntity();
             notif.setEfjavDestinatarioId(prestamo.getEfjavEstudianteId());
+            notif.setEfjavCanal("SISTEMA");
             notif.setEfjavTitulo("Penalidad por devolución fuera de plazo");
             notif.setEfjavContenido("Se ha registrado una suspensión del servicio de biblioteca por " + suspensionDias +
                     " días debido a " + diasRetraso + " días de retraso en la devolución del libro. Vigente hasta: " + finSuspension);

@@ -290,6 +290,7 @@ public class EfjavTramiteService {
     private void efjavMtdNotificarEstudiante(Long estudianteId, String titulo, String contenido) {
         EfjavNotificacionEntity notif = new EfjavNotificacionEntity();
         notif.setEfjavDestinatarioId(estudianteId);
+        notif.setEfjavCanal("SISTEMA");
         notif.setEfjavTitulo(titulo);
         notif.setEfjavContenido(contenido);
         notif.setEfjavTipo("ESTADO_TRAMITE");
